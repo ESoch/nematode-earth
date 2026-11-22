@@ -1,6 +1,6 @@
 # Full-row soil extraction and viewer atlas
 
-On September 22, 2026, we converted the complete ETH abundance and bootstrap uncertainty rasters into the six 512 × 512 faces used by the viewer. The final texture encoding changed the area integral by **0.056%**. Feeding-group composition still comes from a coarser extraction and has its own coverage mask. The September 26 release included this atlas. [Numerical checks](#numerical-checks) · [Shipped atlas metadata](../../../app/public/data/soil_plain_512_v2/cube_meta.json) · [Hosted release record](../../release-evidence-2026-09-26.md)
+On September 22, 2026, we converted the complete ETH abundance and bootstrap uncertainty rasters into the six 512 × 512 faces used by the viewer. The September viewer’s texture encoding changed the area integral by **0.056%**. Feeding-group composition still comes from a coarser extraction and has its own coverage mask. The September 26 release included this atlas. [Numerical checks](#numerical-checks) · [Shipped atlas metadata](../../../app/public/data/soil_plain_512_v2/cube_meta.json) · [Hosted release record](../../release-evidence-2026-09-26.md)
 
 ## Download and extraction evidence
 
@@ -95,7 +95,7 @@ The [development probe](../../../app/soil-validation.html) exercised the viewer�
 
 An ideal float64 reference matched **21 of 24** samples within 0.5% in optical depth. Three thinly supported coastal cells differed by up to 2.1789%. A separate alternating texture showed that this GPU quantized filter weights in 1/256 increments. For example, (0.134366, 0.662338) became (0.1328125, 0.6640625). Half-float rounding affected filtered logarithms and truncated positive optical-depth readback by up to one unit in the last place. A Float32 target checked exponentiation separately.
 
-Using those measured stages, the reference matched **24 of 24** probes. The harness retains both comparisons. These sampled points do not measure the integral of the full raymarched image, continuity across all cube seams or performance on other devices.
+Using those measured stages, the reference matched **24 of 24** probes. The current viewer decodes optical depth before filtering near coasts. Its measurements are in the [November rendering checks](../../rendering-checks.md). These sampled points do not measure the integral of the full raymarched image, continuity across all cube seams or performance on other devices.
 
 ### Viewer and tests
 

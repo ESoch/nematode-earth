@@ -15,94 +15,19 @@ import {
 } from '../field/terrainNodes'
 
 /**
- * "Matter": the real, ETOPO-derived planet standing in front of the veil
- * until the sweep erodes it away. Real elevation (land relief AND seafloor
- * bathymetry, both real ETOPO 2022 data, `app/public/data/elevation_*`) and
- * land fraction (the same atlas's G channel — see `sampleLandMaskNode`,
- * which is why the coastline is as sharp as the relief rather than eight
- * times softer) drive shape and colour; nothing here is invented. Dissolving a recognisable Earth is the whole point of the
- * sweep (a placeholder ball dissolving is nothing), so this is the moment
- * the piece stops looking like an experiment and starts looking like the
- * planet Cobb was talking about.
+ * The opaque globe writes depth in front of the nematode shell. The
+ * atmosphere front dims the rim and city lights. Water and rock fronts
+ * discard whole fragments. Once both fronts finish, the viewer skips the
+ * mesh until playback or scrubbing brings it back.
  *
- * This mesh is what makes the sweep's governing rule (spec 6.1) literally
- * true in the render: "the veil renders at full opacity from frame zero,
- * OCCLUDED by matter rather than faded in." The veil's own material
- * (regimes/Shell.ts) is untouched by anything in this file or by the sweep
- * at all - it always computes the same density it always would. What the
- * sweep controls is whether THIS mesh is still standing in front of it.
- * Opaque + normal depth write/test is what does the actual occluding; as
- * fragments here get discarded, the shell material behind them is simply
- * no longer blocked, not faded up. `matter.test.ts` enforces this
- * structurally (a literal `Discard(` and a literal, non-variable
- * `vec4(color, 1.0)` alpha), unchanged and unweakened by this rewrite.
+ * ETOPO elevation and land fraction shape the surface. During the drain,
+ * bathymetry moves the ocean surface from sea level to the measured bed.
+ * The same progress changes its colour, reveals seafloor slopes and fades
+ * the water reflection. The water dissolve starts after the drain finishes.
+ * Land keeps its elevation exaggeration throughout.
  *
- * THREE LAYERS, the spec's stated erosion order (atmosphere, then water,
- * then rock — `Dissolve.ts`'s three fronts, one per layer):
- *  - Atmosphere: not a separate haze geometry, but the intensity of the
- *    Rayleigh-shaped scattering glow below (see the ATMOSPHERE_* constants)
- *    - it is the first thing to visibly fade, exactly as "atmosphere
- *    clears first" would look, at zero extra geometry cost.
- *  - Water: drives OCEAN fragments' discard only (see `landFraction`-
- *    weighted blend below) — NOT their displacement or colour any more; see
- *    the OCEAN COLLAPSE section below for why those two were pulled apart.
- *  - Rock: drives LAND fragments' discard, unchanged from the placeholder.
- *
- * LAND is always shown at full exaggerated relief from frame zero — it is
- * part of "a recognisable planet," not something the sweep animates into
- * being. Only OCEAN's shape and colour animate (via `bathymetry`).
- *
- * OCEAN COLLAPSE: `SweepState.bathymetry` alone drives both the seafloor's
- * displacement AND its colour — deliberately NOT combined with `waterAlpha`
- * (the water dissolve front) any more. It used to be: `oceanProgress =
- * clamp(max(1 - waterAlpha, opts.bathymetry), 0, 1)`, "as the water
- * dissolves, the surface drops to bathymetry" read literally. A multi-agent
- * audit found this was provably a no-op: `1 - waterAlpha` saturates to
- * EXACTLY 1, network-wide, the instant `frontWater` reaches 1 (`Dissolve.ts`'s
- * `layerAlpha` endpoint-totality — not asymptotic), which happened at
- * t=7.4s under the old timing, well before `opts.bathymetry` ever left 0
- * (t=9.0s) — so the `max` was ALWAYS won by `1 - waterAlpha`, and
- * `bathymetry` never once affected the result. Worse: since the SAME
- * `waterAlpha` also drove the fragment `Discard`, a fragment's displacement
- * progress and its odds of being visible at all were the exact same number
- * on opposite sides of 1 — the more a patch of seafloor had dropped, the
- * more likely it was to already be 100% discarded. Expected visible signal
- * (fraction rendered x how far it had dropped) is bounded by
- * `alpha * (1 - alpha) <= 0.25` by construction; the reveal could not have
- * been seen no matter how it was lit.
- *
- * Fixing the coupling alone would still not have produced a VISIBLE beat:
- * the actual geometric drop (up to ~6 km of bathymetry) was independently
- * measured at well under one screen pixel from the piece's opening
- * altitude. So displacement is fixed because it was WRONG (bathymetry now
- * drives it alone, timed via `Timeline.ts`'s retimed `WIN.bathymetry` to
- * complete before water's own discard front ever moves — see that file's
- * doc), not because the fix alone makes the beat readable. What actually
- * carries the beat is COLOUR: `hypsometricColorNode` now takes the same
- * `oceanProgress` and scales the ocean branch's elevation input by it
- * before the `OCEAN_STOPS` ramp, so the sea visibly deepens — running from
- * the shoreline stop toward the true-depth stop — while still fully opaque.
- * Marine relief is still never exaggerated (spec 7.5) in either the
- * displacement OR the shading normal now — see `terrainNormalNode`'s doc
- * for a second, unrelated case of that rule that had slipped through.
- *
- * CITY LIGHTS (GHSL built-up fraction, `field/terrain.ts`'s city-lights
- * section): the setup half of the piece's central visual rhyme (spec 6.3) —
- * the same built-up fraction that glows warm here becomes a SUPPRESSION on
- * the veil's density once matter is gone (paved ground holds less life),
- * so the brightest coastlines before are the darkest voids after. Only
- * the glow is wired here; the veil-side suppression is a separate,
- * not-yet-calibrated consumer of the same cube (see `viewer.ts`'s wiring
- * comment) and deliberately isn't guessed at in this file.
- *
- * Lights are warm (the only warm thing on screen — the planet is muted
- * blue-green-brown, the veil cold cyan), night-side only (so this reads as
- * "Earth at night," not a data overlay), and tied to the ATMOSPHERE front
- * alongside the atmosphere glow — civilization's glow is the first thing to go dark as
- * erosion starts, well before the rest of the terrain visibly changes,
- * which is what gives a scrubbing viewer room to actually notice the
- * lights going out as its own beat rather than losing it in the rest of
- * the dissolve.
+ * GHSL built-up surface provides a visual proxy for city lights. The
+ * soil-abundance model supplies the green-to-tan palette on land.
  */
 
 /**
@@ -155,28 +80,9 @@ const AMBIENT_NIGHT_FLOOR = 0.08
 const DIFFUSE = 0.85
 
 /**
- * The veil is genuinely faint (4.06% mean coverage over land, spec 6.2 -
- * PER WALL; see `viewer.ts`'s exposure comment for why the far wall,
- * `regimes/Shell.ts`'s `ShellFarWallOpts`, roughly doubles that near disc
- * centre without changing the underlying density) and needs
- * `viewer.ts`'s default 8x `toneMappingExposure` to read at all - that
- * lift is applied globally, post-render, to everything in the scene, not
- * per-material. Terrain colour authored at a normal-ish albedo (the
- * LAND_STOPS/OCEAN_STOPS ramps in `field/terrain.ts`) blows out to
- * near-white under the SAME 8x lift ("reads as an ice planet" - team
- * lead's finding from the first real render; confirmed it wasn't the
- * colour ramp itself, whose grey/white stops only start at 4500 m -
- * every stop was clipping, not just the snow line).
- *
- * Fix, per team lead's explicit call ("scale the matter's emitted colour
- * ... simplest, keeps a single exposure control meaningful" over a second,
- * separate tonemap): divide matter's own output by the SAME factor the
- * veil is lifted by, so one shared exposure control lands both correctly
- * instead of requiring two different renders bolted together. This is
- * authored for the DEFAULT exposure specifically - if the user pushes
- * exposure higher/lower via `[`/`]`, matter and veil both move together
- * proportionally from their respective correctly-authored baselines, which
- * is exactly what "a single exposure control" is supposed to mean.
+ * The viewer exposes the whole scene at 8× to show the translucent shell.
+ * Scale the terrain palette so its brightest land and ocean colours retain
+ * detail at the same exposure.
  */
 const EXPOSURE_COMPENSATION = 1 / 8 // must track viewer.ts's default `exposure`
 /**
@@ -248,13 +154,8 @@ const TERMINATOR_GLOW_WIDTH = 0.06
 const TERMINATOR_SUN_PATH = 10
 
 /**
- * Ocean specular: a broad, restrained Blinn-Phong sun-glint lobe
- * (`specularLobeNode`) brightened toward grazing angles by Schlick's
- * Fresnel approximation (`schlickFresnelNode`) — both are lighting terms,
- * not a texture. Masked to ocean fragments only (`1 - landFraction`) and
- * tied to the WATER dissolve front, so the glint fades with the same layer
- * that governs ocean discard/bathymetry. Kept soft on purpose — "a
- * blown-out sun glint would fight the veil" (brief).
+ * A broad Blinn-Phong sun-glint lobe with Schlick Fresnel brightening.
+ * The reflection fades as the sweep exposes the dry seabed.
  */
 const OCEAN_SPECULAR_SHININESS = 50
 const OCEAN_SPECULAR_F0 = 0.02
@@ -291,20 +192,14 @@ export interface MatterOpts {
   atmosphere: DissolveUniforms
   water: DissolveUniforms
   rock: DissolveUniforms
-  /** `SweepState.bathymetry` — the SOLE driver of ocean displacement AND colour (see module doc's OCEAN COLLAPSE section); deliberately not combined with the water dissolve front any more. */
+  /** The fraction of seafloor relief exposed by the drain, from 0 to 1. */
   bathymetry: THREE.UniformNode<'float', number>
   /** `math/descent.ts`'s `exaggerationAt(altM)` — land only; marine relief is never exaggerated (spec 7.5). */
   exaggeration: THREE.UniformNode<'float', number>
   elevationTexture: THREE.CubeTexture
-  /**
-   * `.a` (land fraction) AND `.r` (log-density, this app's vegetation
-   * proxy — see `field/terrain.ts`'s "Vegetation as colour" section) are
-   * both read here now; `.r` is the exact same tau-encoded channel
-   * `regimes/Shell.ts` turns into the veil's optical depth, sampled
-   * un-exponentiated (`sampleLogTauNode`).
-   */
+  /** Soil optical depth supplies the log-scaled land tint through sampleLogTauNode. */
   densityTexture: THREE.CubeTexture
-  /** GHSL built-up fraction (`.r`) — drives the city-lights glow. Same cube `impl-pipeline` bakes for the veil's (separate, not-yet-wired) urban suppression — see module doc. */
+  /** GHSL built-up fraction in the red channel supplies the night-light proxy. */
   urbanTexture: THREE.CubeTexture
   /** One elevation-atlas texel's angular width in radians (from the loaded atlas's `km_per_texel`) — sets the relief-normal's neighbour-tap spacing. A plain JS number baked into the graph at build time, not a uniform. */
   texelAngularWidthRad: number
@@ -336,16 +231,13 @@ export function buildMatterMaterial(opts: MatterOpts): THREE.NodeMaterial {
     // thematically exact, not just visually convenient).
     const logTau = sampleLogTauNode(opts.densityTexture, dir)
     const vegIndex = vegetationIndexNode(logTau, VEGETATION_ARID_LOG_TAU, VEGETATION_LUSH_LOG_TAU)
-    // oceanProgress: see module doc's OCEAN COLLAPSE section - this is the
-    // SOLE driver of both the seafloor's displacement (positionNode, below)
-    // and its colour, deliberately not combined with waterAlpha.
+    // Reveal the measured seabed while ocean fragments are still opaque.
     const oceanProgress = clamp(opts.bathymetry, 0, 1)
     const baseColor = hypsometricColorNode(elevation, landFraction, latDeg, vegIndex, oceanProgress)
-    // landFraction gates the exaggeration applied to the SHADING NORMAL's
-    // slope, exactly as terrainDisplacementNode already gates displacement -
-    // marine relief must not be exaggerated anywhere (spec 7.5), and this
-    // was the one place that slipped through (see terrainNormalNode's doc).
-    const coarseNormal = terrainNormalNode(opts.elevationTexture, dir, opts.exaggeration, landFraction, opts.texelAngularWidthRad)
+    const coarseNormal = terrainNormalNode(
+      opts.elevationTexture, dir, opts.exaggeration, landFraction, oceanProgress, opts.texelAngularWidthRad,
+    )
+    const waterSurface = float(1).sub(clamp(landFraction, 0, 1)).mul(float(1).sub(oceanProgress))
 
     // Fine-scale detail, normal-only (see DETAIL_* constants' doc) - camera
     // sits pinned at the render origin under floating-origin translation
@@ -353,7 +245,7 @@ export function buildMatterMaterial(opts: MatterOpts): THREE.NodeMaterial {
     // the camera-to-fragment distance, no extra uniform needed.
     const viewDistance = length(positionWorld)
     const detailStrength = detailFadeByDistanceNode(viewDistance, DETAIL_FULL_STRENGTH_M, DETAIL_FADE_OUT_M)
-      .mul(DETAIL_MAX_STRENGTH)
+      .mul(DETAIL_MAX_STRENGTH).mul(float(1).sub(waterSurface))
     const normal = detailBumpedNormalNode(coarseNormal, dir, detailStrength, DETAIL_FREQUENCY)
 
     const sunDir = vec3(SUN_DIR.x, SUN_DIR.y, SUN_DIR.z)
@@ -405,8 +297,8 @@ export function buildMatterMaterial(opts: MatterOpts): THREE.NodeMaterial {
       .mul(sunAvailability).mul(ATMOSPHERE_STRENGTH).mul(atmosphereAlpha)
 
     // Ocean specular sun-glint: Blinn-Phong half-vector lobe, Fresnel-
-    // brightened toward grazing angles, masked to ocean fragments and tied
-    // to the water front (see OCEAN_SPECULAR_* constants' doc above).
+    // brightened toward grazing angles and confined to the water surface
+    // as it drains (see OCEAN_SPECULAR_* constants' doc above).
     // Carries the same sunlight tint, so a glint caught near the terminator
     // is the orange one you actually see from orbit.
     const halfDir = viewDir.add(sunDir).normalize()
@@ -414,9 +306,8 @@ export function buildMatterMaterial(opts: MatterOpts): THREE.NodeMaterial {
     const specIntensity = oceanSpecularIntensityNode(
       ndotH, cosView, OCEAN_SPECULAR_SHININESS, OCEAN_SPECULAR_F0, OCEAN_SPECULAR_STRENGTH,
     )
-    const oceanMask = float(1).sub(clamp(landFraction, 0, 1))
     const specular = vec3(OCEAN_SPECULAR_COLOR.r, OCEAN_SPECULAR_COLOR.g, OCEAN_SPECULAR_COLOR.b)
-      .mul(specIntensity).mul(sunTransmittance).mul(oceanMask).mul(waterAlpha)
+      .mul(specIntensity).mul(sunTransmittance).mul(waterSurface)
 
     // City lights (base, unbumped dir - same reasoning as above).
     const night = nightFactorNode(ndotSun, TERMINATOR_WIDTH)
@@ -453,10 +344,7 @@ export function buildMatterMaterial(opts: MatterOpts): THREE.NodeMaterial {
     const dir = normalGeometry.normalize()
     const elevation = sampleElevationNode(opts.elevationTexture, dir)
     const landFraction = sampleLandMaskNode(opts.elevationTexture, dir)
-    // Driven by bathymetry ALONE - see module doc's OCEAN COLLAPSE section
-    // for why this must NOT be coupled to waterAlpha (it used to be
-    // clamp(max(1-waterAlpha, opts.bathymetry), 0, 1), which made bathymetry
-    // mathematically dead and confounded displacement with the discard).
+    // Match the drain progress used for lighting and colour.
     const oceanProgress = clamp(opts.bathymetry, 0, 1)
     const displacement = terrainDisplacementNode(elevation, landFraction, opts.exaggeration, oceanProgress)
     return positionGeometry.add(dir.mul(displacement))

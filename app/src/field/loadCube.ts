@@ -57,6 +57,8 @@ export interface CubeMeta {
   schema?: 'soil-cube-candidate-v1' | typeof SOIL_V2
   /** Only v2 declares independent composition coverage. Legacy G validity is unknown. */
   groups_policy?: 'separate-coverage'
+  /** True when the bake measured identical CV and density support across all texels. */
+  cvSupportMatchesDensity?: boolean
   group_support?: GroupSupportMeta
   face_sha256?: Readonly<Record<string, string>>
 }
@@ -191,6 +193,8 @@ export function parseCubeMeta(json: unknown): CubeMeta {
     if (obj.groups_policy !== 'separate-coverage') {
       throw new Error('cube_meta.json: v2 groups_policy must be separate-coverage')
     }
+    const validation = obj.validation as { diagnostics?: { cv_support_difference_area_m2?: number } } | undefined
+    meta.cvSupportMatchesDensity = validation?.diagnostics?.cv_support_difference_area_m2 === 0
     meta.groups_policy = 'separate-coverage'
     meta.group_support = parseGroupSupport(obj.group_support, faceSize)
     meta.face_sha256 = parseFaceHashes(obj.face_sha256, 'face', 'face_sha256')
@@ -202,7 +206,7 @@ export function parseCubeMeta(json: unknown): CubeMeta {
 
 /**
  * Whether this atlas's R channel is a `log(density)` that
- * `densityFaceToTauFace` should re-encode to `log(tau)`.
+ * the loader should convert to optical depth before upload.
  *
  * This dispatch exists because `loadCubeTexture` used to apply that re-encode
  * to EVERY atlas it loaded, and the re-encode is an unconditional
@@ -272,26 +276,8 @@ export interface LoadedCube {
 
 const LOG_E_A = Math.log(E_A)
 
-/**
- * Converts one fetched face's R channel from log(density_per_sqm) — what
- * the pipeline bakes, per `cube_meta.json`'s `channels.R` ("decode with
- * exp(R)" gives density, individuals/m^2) — to log(tau), tau = E_A *
- * density_per_sqm (`math/optical.ts`'s `tauNadir`). That is the quantity
- * `regimes/Shell.ts`'s cube-sampling branch actually expects: it decodes
- * with a bare `exp(R)` and feeds the result straight into the optical-depth
- * march, mirroring `bakeCube.ts`'s synthetic bake, where R already IS
- * log(tau) (`encodeLogTau`). Skipping this conversion would hand the
- * shader raw individual counts (~1e6-1e7) as if they were already an
- * optical depth — many orders of magnitude past `tauCap` — so `min(tau,
- * tauCap)` clamps every land AND ocean texel to the same constant,
- * rendering uniform despite real density spanning orders of magnitude.
- *
- * Returns a NEW array — `loadCubeTexture`'s returned `faces` (used for the
- * CPU-side density probes in `geoProbe.ts`) must keep decoding to actual
- * density, so the raw fetched bytes are never mutated in place.
- *
- * G, B, A pass through unchanged. In v2 G remains a weighted numerator;
- * only a composition consumer divides by its separate support, never A.
+/** Legacy density uploads use the synthetic cube's log(tau) convention.
+ * The raw face remains available for geographic probes.
  */
 export function densityFaceToTauFace(faceData: Uint16Array): Uint16Array {
   const out = new Uint16Array(faceData.length)
@@ -303,6 +289,47 @@ export function densityFaceToTauFace(faceData: Uint16Array): Uint16Array {
     out[i + 1] = faceData[i + 1] ?? 0
     out[i + 2] = faceData[i + 2] ?? 0
     out[i + 3] = faceData[i + 3] ?? 0
+  }
+  return out
+}
+
+export interface SoilFilterEncoding {
+  scale: number
+  cvUsesDensitySupport: boolean
+}
+
+/** GPU-only encoding for soil v2. Power-of-two scaling preserves small coastal
+ * contributions in filterable RGBA16F. G keeps its independent support.
+ */
+export function soilFilterEncoding(texture: THREE.CubeTexture): SoilFilterEncoding | undefined {
+  return texture.userData.soilFilter as SoilFilterEncoding | undefined
+}
+
+// Three's toHalfFloat truncates. Choose the nearest half (ties to even) so
+// the geographic integral has no systematic downward bias from this upload.
+function nearestPositiveHalf(value: number): number {
+  const lower = THREE.DataUtils.toHalfFloat(value)
+  const lowValue = THREE.DataUtils.fromHalfFloat(lower)
+  if (lowValue === value) return lower
+  const upper = lower + 1
+  const midpoint = (lowValue + THREE.DataUtils.fromHalfFloat(upper)) / 2
+  return value > midpoint || (value === midpoint && lower % 2 === 1) ? upper : lower
+}
+
+export function soilFaceForFiltering(raw: Uint16Array, encoding: SoilFilterEncoding): Uint16Array {
+  const out = new Uint16Array(raw.length)
+  const { scale, cvUsesDensitySupport } = encoding
+  for (let i = 0; i < raw.length; i += CUBE_CHANNELS) {
+    const support = THREE.DataUtils.fromHalfFloat(raw[i + 3]!)
+    if (support > 0) {
+      const logDensity = THREE.DataUtils.fromHalfFloat(raw[i]!)
+      out[i] = nearestPositiveHalf(Math.exp(logDensity) * E_A * scale)
+      out[i + 3] = nearestPositiveHalf(support * scale)
+    }
+    out[i + 1] = raw[i + 1]!
+    out[i + 2] = cvUsesDensitySupport
+      ? nearestPositiveHalf(THREE.DataUtils.fromHalfFloat(raw[i + 2]!) * support * scale)
+      : raw[i + 2]!
   }
   return out
 }
@@ -423,7 +450,9 @@ async function fetchGroupSupport(baseUrl: string, index: number, meta: GroupSupp
 }
 
 /** Validate the integrity-checked v2 bytes before constructing any textures. */
-function validateSoilFace(face: Uint16Array, support: Uint16Array, index: number): void {
+function validateSoilFace(face: Uint16Array, support: Uint16Array, index: number): number {
+  let maxLogDensity = -Infinity
+  let maxCvNumerator = 0
   for (let i = 0; i < face.length; i += CUBE_CHANNELS) {
     const r = THREE.DataUtils.fromHalfFloat(face[i]!)
     const g = THREE.DataUtils.fromHalfFloat(face[i + 1]!)
@@ -435,20 +464,24 @@ function validateSoilFace(face: Uint16Array, support: Uint16Array, index: number
       throw new Error(`${at} RGBA channels must be finite`)
     }
     if (a < 0 || a > 1) throw new Error(`${at} A must be in [0,1]`)
+    if (a > 0) {
+      maxLogDensity = Math.max(maxLogDensity, r)
+      maxCvNumerator = Math.max(maxCvNumerator, b * a)
+    }
     if (b < 0) throw new Error(`${at} B (bootstrap CV) must be nonnegative`)
     if (g < 0 || g > gs) throw new Error(`${at} G numerator must be in [0, own group support]`)
   }
+  const peak = Math.max(1, Math.exp(maxLogDensity) * E_A, maxCvNumerator)
+  if (!Number.isFinite(peak)) throw new Error(`face_${index}.bin: density exceeds linear optical depth range`)
+  return peak
 }
 
 /**
  * Fetches `${baseUrl}/cube_meta.json`, then its six `face_N.bin` faces and
  * (v2 only) six independent group-support faces in parallel. Builds a `THREE.CubeTexture` matching
- * `bakeCube.ts`'s output in every respect except channel count: same
- * `CubeReflectionMapping`, `ClampToEdgeWrapping`, `LinearFilter` min/mag,
- * `HalfFloatType`, `NoColorSpace`, `generateMipmaps = false` — AND the same
- * `exp(R) == tau` contract, via `densityFaceToTauFace` (see its doc): the
- * GPU texture's R channel is tau-encoded, while the `faces` returned
- * alongside it stay density-encoded for CPU-side probes.
+ * the plain-cube orientation and linear filtering used by the shell. Raw
+ * faces stay available for geographic probes. Soil v2 packs linear optical
+ * depth and, when the source confirms matching support, a CV numerator.
  */
 export async function loadCubeTexture(baseUrl: string): Promise<LoadedCube> {
   const controller = new AbortController()
@@ -494,16 +527,22 @@ async function loadCubeAttempt(baseUrl: string, controller: AbortController): Pr
   })
   const faces = values.slice(0, CUBE_FACE_COUNT)
   const groupSupportFaces = groupMeta ? values.slice(CUBE_FACE_COUNT) : undefined
-  if (groupSupportFaces) faces.forEach((face, i) => validateSoilFace(face, groupSupportFaces[i]!, i))
-  // Only the DENSITY atlas gets the tau re-encode; see `needsTauEncoding`
-  // for what applying it to the other two silently destroyed.
-  const tauFaces = needsTauEncoding(meta) ? faces.map(densityFaceToTauFace) : faces
+  let soilFilter: SoilFilterEncoding | undefined
+  if (groupSupportFaces) {
+    const peak = Math.max(...faces.map((face, i) => validateSoilFace(face, groupSupportFaces[i]!, i)))
+    // Keep enough headroom for large v2 products, and normal binary16
+    // precision for even the smallest supported cell in the shipping atlas.
+    const scale = 2 ** Math.min(13, Math.floor(Math.log2(65504 / peak)))
+    soilFilter = { scale, cvUsesDensitySupport: meta.cvSupportMatchesDensity === true }
+  }
+  const uploadFaces = soilFilter ? faces.map(face => soilFaceForFiltering(face, soilFilter))
+    : needsTauEncoding(meta) ? faces.map(densityFaceToTauFace) : faces
 
   // Elevation atlases carry the land mask Matter shades against; refuse one
   // that does not actually have it (see assertLandMaskPopulated).
   if (meta.field === 'elevation') assertLandMaskPopulated(faces, baseUrl)
 
-  const faceTextures = tauFaces.map((tauData) => {
+  const faceTextures = uploadFaces.map((tauData) => {
     const tex = new THREE.DataTexture(tauData, meta.face_size, meta.face_size, THREE.RGBAFormat, THREE.HalfFloatType)
     tex.needsUpdate = true
     return tex
@@ -521,6 +560,7 @@ async function loadCubeAttempt(baseUrl: string, controller: AbortController): Pr
     1,
     THREE.NoColorSpace,
   )
+  if (soilFilter) texture.userData.soilFilter = soilFilter
   texture.generateMipmaps = false
   texture.needsUpdate = true
 
@@ -574,7 +614,7 @@ export function cubeFaceSize(texture: THREE.CubeTexture): number {
  * viewer actually sees, not its resolution. Bilinear is C0 — its gradient
  * jumps across every texel-cell boundary — so EVERY crease in the magnified
  * field lies exactly on a texel edge, which is the polygonal faceting the
- * veil shows. Magnify the shipped `exp(R)*A` field to that scale and 100.0%
+ * veil shows. In the original filtering experiment, 100.0%
  * of its second-derivative mass sits on the texel-boundary lines under
  * bilinear. `test/cubeFilter.test.ts` reproduces that instrument on
  * `field/synthetic.ts`'s analytic stand-in for the atlas (which is what the

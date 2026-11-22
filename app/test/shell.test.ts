@@ -51,12 +51,12 @@ describe('the ocean no-data fix: the cube branch reads the A channel, not just R
     // test/cubeFilter.test.ts). That changes WHERE the sample is taken, not
     // that R and A come off one fetch, which is what this test is about.
     expect(shellSource).toMatch(/const cubeSample = cubeTexture\(texture, dir\)\.level\(float\(0\)\)/)
-    expect(shellSource).toMatch(/const logTau = cubeSample\.r/)
+    expect(shellSource).toMatch(/filteredTauNode\(texture, cubeSample\.r\)/)
     expect(shellSource).toMatch(/cubeSample\.a\b/)
   })
 
   it('clamps the land-fraction read to [0,1], matching every other landFraction use in this codebase', () => {
-    expect(shellSource).toMatch(/landFraction = clamp\(cubeSample\.a, 0, 1\)/)
+    expect(shellSource).toMatch(/landFraction = clamp\(filteredSupportNode\(texture, cubeSample\.a\), 0, 1\)/)
   })
 
   it('does not add atlas coverage to the analytic-field branch', () => {
@@ -104,7 +104,7 @@ describe('the far wall: marches a second shell segment through the planet interi
     // with the `u` overlay); both walls must still route through the one
     // shared marchSegment, which is what this test is actually about.
     expect(shellSource).toMatch(/marchSegment\(opts, ro, rd, invA, invB, tEnter, dt, col, transmittance, uncertainty\)/)
-    expect(shellSource).toMatch(/marchSegment\(opts, ro, rd, invA, invB, tEnter2, dt, col, transmittance, uncertainty\)/)
+    expect(shellSource).toMatch(/marchSegment\(opts, ro, rd, invA, invB, tEnter2, dt, col, transmittance, uncertainty, opts\.farWall\?\.visibility\)/)
   })
 
   it('declares ShellFarWallOpts with a per-frame enabled gate', () => {
@@ -259,7 +259,7 @@ describe('the overlay averages CV over the column that actually contributed ligh
   })
 
   it('accumulates across BOTH walls, so the far side is not silently excluded', () => {
-    const calls = shellSource.match(/marchSegment\(opts, ro, rd, invA, invB, \w+, dt, col, transmittance, uncertainty\)/g) ?? []
+    const calls = shellSource.match(/marchSegment\(opts, ro, rd, invA, invB, \w+, dt, col, transmittance, uncertainty(?:, opts\.farWall\?\.visibility)?\)/g) ?? []
     expect(calls).toHaveLength(2)
   })
 })

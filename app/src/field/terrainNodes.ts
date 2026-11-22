@@ -12,6 +12,7 @@ import {
   VEIL_DITHER_AMPLITUDE,
   type Stop,
 } from './terrain'
+import { filteredCvNode, filteredLogTauNode } from './densityCoverage'
 import { WGS84 } from '../math/wgs84'
 import { geographicCubeTexture as cubeTexture } from './geographicCube'
 
@@ -60,19 +61,9 @@ export function sampleLandMaskNode(elevationTex: THREE.CubeTexture, dirNode: Vec
   return cubeTexture(elevationTex, dirNode).level(float(0)).g
 }
 
-/**
- * The density cube's R channel is `log(tau)` on the GPU (`field/loadCube.ts`'s
- * `densityFaceToTauFace` conversion at load time — NOT raw log-density,
- * that conversion already happened before this texture reached the GPU),
- * the exact same quantity `regimes/Shell.ts`'s `logTau = cubeTexture(...).r`
- * feeds into `exp()` for the veil's optical depth. Deliberately returned
- * un-exponentiated here: `vegetationIndexNode`'s smoothstep operates
- * directly in log space, where the real land distribution is well
- * conditioned (see `terrain.ts::VEGETATION_ARID_LOG_TAU`'s doc), rather
- * than on raw `tau` which spans many more orders of magnitude.
- */
+/** The vegetation ramp uses log optical depth for all density encodings. */
 export function sampleLogTauNode(densityTex: THREE.CubeTexture, dirNode: Vec3Node): FloatNode {
-  return cubeTexture(densityTex, dirNode).level(float(0)).r
+  return filteredLogTauNode(densityTex, cubeTexture(densityTex, dirNode).level(float(0)).r)
 }
 
 /**
@@ -157,52 +148,31 @@ export function hypsometricColorNode(
   return mix(ocean, land, clamp(landFractionNode, 0, 1))
 }
 
-/** TSL mirror of `terrain.ts::terrainDisplacementM`. */
+/** TSL mirror of terrain.ts's effectiveExaggeration. */
+function terrainReliefScaleNode(landFraction: FloatNode, exaggeration: FloatNode, bathymetry: FloatNode): FloatNode {
+  return mix(clamp(bathymetry, 0, 1), exaggeration, clamp(landFraction, 0, 1))
+}
+
 export function terrainDisplacementNode(
   elevationNode: FloatNode,
   landFractionNode: FloatNode,
   exaggerationNode: FloatNode,
   bathymetryNode: FloatNode,
 ): FloatNode {
-  const land = elevationNode.mul(exaggerationNode)
-  const ocean = elevationNode.mul(clamp(bathymetryNode, 0, 1))
-  return mix(ocean, land, clamp(landFractionNode, 0, 1))
+  return elevationNode.mul(terrainReliefScaleNode(landFractionNode, exaggerationNode, bathymetryNode))
 }
 
 /**
- * Relief-shading normal from 4 neighbour elevation taps, direction-
- * perturbed rather than UV-offset — a cube map has no single UV space that
- * survives a face-boundary crossing, but perturbing the SAMPLING DIRECTION
- * by a small angle and letting hardware cube sampling pick the (possibly
- * different) face handles that transparently, the same reason every other
- * cube sample in this codebase is direction-based rather than face+uv.
- *
- * `texelAngularWidthRad` is a plain JS number (from the loaded atlas's
- * `km_per_texel`, converted to radians via `R_MEAN`), not a runtime node —
- * baked into the graph at material-build time, matching how `bakeCube.ts`
- * and friends treat face geometry as build-time constants throughout.
- *
- * Mirrors `terrain.ts`'s `tangentBasis` + `centralDifferenceSlope` +
- * `heightfieldNormal` + `applyTangentSpaceBump` chain exactly, just fused
- * into one function since TSL has no equivalent of returning a small
- * struct of intermediate nodes without extra ceremony — AND, as of
- * `landFractionNode`, `terrain.ts::effectiveExaggeration`: the slope is
- * scaled by an exaggeration factor gated by land fraction (1 on pure
- * ocean, `exaggerationNode` on pure land), not by `exaggerationNode`
- * unconditionally as before. That was a real bug, not a hypothetical one —
- * spec 7.5 says marine relief is never exaggerated, and displacement
- * already honoured that (`terrainDisplacementNode`'s ocean term has no `k`
- * at all), but this function was multiplying every fragment's slope by the
- * land exaggeration factor regardless of land/ocean, so the SEAFLOOR'S
- * SHADING NORMAL — never its actual displaced position — was lit as if
- * bathymetry were exaggerated by k (measured ~3.6, `K_MAX`, essentially
- * throughout the piece).
+ * Sample four neighbouring elevations in tangent directions. Sampling by
+ * direction lets the cube sampler cross face edges. Use the vertex shader's
+ * relief scale so lighting follows the surface as the ocean drains.
  */
 export function terrainNormalNode(
   elevationTex: THREE.CubeTexture,
   dirNode: Vec3Node,
   exaggerationNode: FloatNode,
   landFractionNode: FloatNode,
+  bathymetryNode: FloatNode,
   texelAngularWidthRad: number,
 ): Vec3Node {
   const n = dirNode.normalize()
@@ -225,10 +195,7 @@ export function terrainNormalNode(
   // centralDifferenceSlope: spacing is the FULL separation between the two
   // taps (angle 2*eps), converted to metres via the mean radius.
   const spacingM = float(WGS84.R_MEAN * 2 * texelAngularWidthRad)
-  // effectiveExaggeration: 1 (unexaggerated) on pure ocean, exaggerationNode
-  // on pure land — see this function's doc for why this must not be
-  // exaggerationNode unconditionally.
-  const slopeExaggeration = mix(float(1), exaggerationNode, clamp(landFractionNode, 0, 1))
+  const slopeExaggeration = terrainReliefScaleNode(landFractionNode, exaggerationNode, bathymetryNode)
   const dhdx = hPX.sub(hNX).div(spacingM).mul(slopeExaggeration)
   const dhdy = hPY.sub(hNY).div(spacingM).mul(slopeExaggeration)
 
@@ -423,15 +390,10 @@ export function cityLightIntensityNode(builtUpFractionNode: FloatNode, gamma: nu
   return clamp(builtUpFractionNode, 0, 1).pow(gamma)
 }
 
-/**
- * The density cube's B channel: per-pixel bootstrap coefficient of variation
- * (van den Hoogen et al. 2019, 100 iterations). Raw, dimensionless, no
- * encoding — unlike R, which `loadCube.ts` re-encodes to log(tau);
- * `densityFaceToTauFace` passes G/B/A through untouched, so what reaches the
- * GPU here is exactly what the pipeline baked.
- */
+/** Support-weighted bootstrap CV when the source confirms shared coverage. */
 export function sampleBootstrapCvNode(densityTex: THREE.CubeTexture, dirNode: Vec3Node): FloatNode {
-  return cubeTexture(densityTex, dirNode).level(float(0)).b
+  const sample = cubeTexture(densityTex, dirNode).level(float(0))
+  return filteredCvNode(densityTex, sample.b, sample.a)
 }
 
 /**

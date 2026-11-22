@@ -98,7 +98,7 @@ import './hud/viewer.css'
 import { planAtlasLadder, readClientBudgetHints } from './platform/atlasLadder'
 import { sigma0, saturationCapTau, E_A } from './math/optical'
 import { WGS84, geodeticToGeocentricLat } from './math/wgs84'
-import { Timeline, COBB_LINE, T_END } from './sweep/Timeline'
+import { Timeline, COBB_LINE, T_END, farWallVisibilityAt } from './sweep/Timeline'
 import { playbackSeconds } from './sweep/pacing'
 import { createSweepGuide } from './hud/sweepGuide'
 import { createDissolveUniforms } from './sweep/dissolveNodes'
@@ -109,7 +109,7 @@ import {
   buildDepositMaterialCornerVariantForTesting, buildResolveMaterial, type SplatPipeline,
 } from './regimes/SplatBlur'
 import { gaussianTaps } from './math/splat'
-import { partitionAt, REGIME2_TOP_ALT, REGIME2_FULL_ALT } from './regimes/Blend'
+import { particleWindowIntersectsShell, partitionAt, REGIME2_TOP_ALT, REGIME2_FULL_ALT } from './regimes/Blend'
 import type { TslFieldPort } from './field/probeField'
 import { exaggerationAt } from './math/descent'
 import { sigmaPixAt, cellSizeForBudget } from './math/lod'
@@ -204,6 +204,8 @@ if (!isWebGPUAvailable()) {
   }
 
   const scene = new THREE.Scene()
+  // Keep space opaque for consistent tone mapping with and without the particle composite pass.
+  scene.background = new THREE.Color(0x000000)
 
   const Hs = uniform(32000)
   const Hmax = uniform(H_MAX_INITIAL)
@@ -216,15 +218,8 @@ if (!isWebGPUAvailable()) {
   // Nelson Max coupling on the shell side. 1 = unpartitioned (Session 1-3
   // behaviour); updated each frame once regime-2 comparison mode is active.
   const shellPartitionShare = uniform(1)
-  // ShellFarWallOpts.enabled - true only when it is physically valid to
-  // march the shell's far wall (spec 7.3's "Updated: that premise held only
-  // while matter exists"). Computed once per frame, after shellPartitionShare
-  // itself, from that SAME value being exactly 1 (unpartitioned - see
-  // ShellFarWallOpts's doc for why tying the two together, rather than a
-  // separate altitude comparison, is what keeps them from drifting apart)
-  // AND the sweep's matter having fully dissolved. Starts false: at t=0 the
-  // sweep has not begun and matter is fully intact.
   const farWallEnabled = uniform(false)
+  const farWallVisibility = uniform(0)
   // The Cobb inversion slider (spec 6.3, corrected — see Shell.ts's
   // ShellOpts.urban doc and docs/superpowers/results/2026-08-16-urban-
   // claim-ruling.md): 0 = the measurement (no urban effect), 1 = Cobb's
@@ -266,7 +261,7 @@ if (!isWebGPUAvailable()) {
     cube: { texture: cubeTex, sigma0PerTau, tauCap },
     cameraWorldPosition,
     partition: { shellFraction: shellPartitionShare },
-    farWall: { enabled: farWallEnabled },
+    farWall: { enabled: farWallEnabled, visibility: farWallVisibility },
     nMax: 128,
   })
   // Outer shell bound as geometry: the march runs between this backface and
@@ -331,12 +326,7 @@ if (!isWebGPUAvailable()) {
     const bindings = matterAtlasBindings({
       elevation: elevationCube?.texture ?? null,
       density: realCube?.texture ?? null,
-      // GHSL built-up fraction drives the city-lights glow (see Matter.ts's
-      // doc) — same cube impl-pipeline bakes for the veil's separate,
-      // not-yet-wired urban suppression. 512-face (not 128/256 like the
-      // other two atlases): cities are small, sharp features, and the
-      // brief's whole point is that their recognisable SHAPE survives, which
-      // needs more resolution than the broad elevation/density fields do.
+      // Built-up surface drives the city lights and the Cobb illustration.
       urban: urbanCubeTex,
     }, placeholderTerrainCube)
     return buildMatterMaterial({
@@ -581,6 +571,8 @@ if (!isWebGPUAvailable()) {
   const debugDepositScene = new THREE.Scene()
   debugDepositScene.add(debugDepositMesh)
   let debugDeposit = false
+  let particleDrawReady = false
+  const particleKernels = [particles.resetKernel, particles.emitKernel, particles.finalizeKernel]
 
   type RegimeMode = 'shell' | 'particles' | 'blended'
   let regimeMode: RegimeMode = 'blended'
@@ -1033,7 +1025,7 @@ if (!isWebGPUAvailable()) {
     cube: { texture: loaded.texture, sigma0PerTau, tauCap },
     cameraWorldPosition,
     partition: { shellFraction: shellPartitionShare },
-    farWall: { enabled: farWallEnabled },
+    farWall: { enabled: farWallEnabled, visibility: farWallVisibility },
     urban: { texture: urbanCubeTex ?? placeholderTerrainCube, cobbMix: cobbMixUniform },
     uncertainty: { strength: uncertaintyStrength },
     nMax: 128,
@@ -1477,18 +1469,8 @@ if (!isWebGPUAvailable()) {
   addEventListener('resize', syncLayoutMetrics)
   syncLayoutMetrics()
 
-  // Exposure. The veil is genuinely faint — 4.06% coverage at the global (land)
-  // mean, PER WALL — so at exposure 1 it is physically honest and visually
-  // almost nothing. That figure is the single-wall (near-side) rendered
-  // coverage, which is what's on screen for nearly the whole piece (matter
-  // present, or below REGIME2_TOP_ALT); once the far wall is marching too
-  // (ShellFarWallOpts, spec 7.3's "Updated" note) the two walls' PHYSICAL
-  // densities are still each 4.06% - nothing about the data changed - but
-  // their alpha stacks toward the disc centre, so the on-screen coverage
-  // there climbs toward roughly double that. Still a viewing control, not a
-  // change to the density: exposure scales what reaches the eye, never what
-  // the march computes. Session 6 replaces it with a real ACES tonemap;
-  // until then it is the only way to actually see the structure.
+  // Exposure lifts the faint veil for display. It leaves the optical depth
+  // and the two shell segments' transmittance calculations unchanged.
   renderer.toneMapping = THREE.ACESFilmicToneMapping
   let exposure = 8
   const applyExposure = (): void => {
@@ -2388,7 +2370,7 @@ if (!isWebGPUAvailable()) {
     if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) return
     if (!viewerPolicy.allowsKey(e.key)) return
     if (e.key === 'p' || e.key === 'P') {
-      logParticleBuffers().catch((err: unknown) => console.error('particle buffer readback failed:', err))
+      renderFrame(0, true).then(logParticleBuffers).catch((err: unknown) => console.error('particle buffer readback failed:', err))
       return
     }
     if (e.key === 't' || e.key === 'T') {
@@ -2567,7 +2549,7 @@ if (!isWebGPUAvailable()) {
    * investigate. Driving the frame directly removes the harness's own
    * visibility state from the measurement entirely.
    */
-  const renderFrame = async (dtSec: number): Promise<void> => {
+  const renderFrame = async (dtSec: number, measureParticles = false): Promise<void> => {
     // The sweep is a pure function of one number (Timeline.ts) - advancing
     // it here just moves that number forward while playing; scrubbing
     // (the range input's own 'input' listener) sets it directly and pauses,
@@ -2582,6 +2564,7 @@ if (!isWebGPUAvailable()) {
     atmosphereDissolve.front.value = sweepState.frontAtmosphere
     waterDissolve.front.value = sweepState.frontWater
     rockDissolve.front.value = sweepState.frontRock
+    matter.visible = sweepState.frontWater < 1 || sweepState.frontRock < 1
     bathymetryUniform.value = sweepState.bathymetry
 
     // Descent schedule, live: Hs/Hmax shrink (and sigma0PerTau/tauCap follow)
@@ -2685,15 +2668,23 @@ if (!isWebGPUAvailable()) {
     // real regimes/Blend.ts partition.
     const partition = partitionAt(scaleCamera.altitude, TAU_MEAN)
     shellPartitionShare.value = regimeMode === 'particles' ? 0 : regimeMode === 'shell' ? 1 : (1 - partition.w)
-    // ShellFarWallOpts.enabled (see its doc and spec 7.3's "Updated" note):
-    // AND of matter being fully gone (scrub-aware via sweepState, not a
-    // wall-clock threshold) and shellPartitionShare having JUST been set to
-    // exactly 1 above - tying the far wall to the SAME value the partition
-    // itself uses, rather than a separate altitude comparison, is what keeps
-    // the two conditions from ever disagreeing about where the band is.
-    farWallEnabled.value = sweepState.matter <= 0 && shellPartitionShare.value >= 1
+    // The last solid fragment disappears before the timeline's settle ends.
+    // Reveal the background during that interval and reverse it when scrubbing.
+    farWallVisibility.value = farWallVisibilityAt(sweepState.t)
+    farWallEnabled.value = !matter.visible && farWallVisibility.value > 0 && shellPartitionShare.value >= 1
 
     const windowOut = Math.min(Math.max(scaleCamera.altitude * 0.5, 500), 50000)
+    const drawParticles = regimeMode !== 'shell' && (
+      regimeMode === 'particles' || debugDeposit || particleWindowIntersectsShell(wpLen, windowOut, state.Hmax)
+    )
+    renderer.render(scene, camera)
+    regimeModeVal.textContent = regimeMode + (debugDeposit ? ' [raw deposit — v to exit]' : '')
+    if (!drawParticles && !measureParticles) {
+      particleDrawReady = false
+      regimeStatsFaint.textContent = ' (particle pass inactive)'
+      return
+    }
+
     const windowIn = windowOut * 0.1
     lastWindowIn = windowIn
     lastWindowOut = windowOut
@@ -2736,16 +2727,16 @@ if (!isWebGPUAvailable()) {
       lastSigmaPix = sigmaPixTarget
     }
 
-    regimeModeVal.textContent = regimeMode + (debugDeposit ? ' [raw deposit — v to exit]' : '')
     regimeStatsFaint.textContent = ` (synthetic particle test, ${particleStats.candidates.toLocaleString()} candidates, ${particleStats.cellSize.toFixed(1)} m cells, ${(REGIME2_FULL_ALT / 1000).toFixed(1)}–${(REGIME2_TOP_ALT / 1000).toFixed(1)} km altitude)`
 
-    // Render-then-compute, one frame of latency by design (regimes/Particles.ts's
-    // doc comment): this frame's draw consumes the PREVIOUS frame's emitted
-    // records/indirect args, and only after drawing do we recompute new ones
-    // for next frame.
-    renderer.render(scene, camera)
+    // On re-entry, discard the indirect draw left at the previous pose.
+    // Submit fresh records before the first draw. Subsequent frames retain
+    // the normal one-frame overlap between drawing and computing.
+    const primeDraw = drawParticles && !particleDrawReady
+    if (primeDraw) renderer.compute(particleKernels)
+    particleDrawReady = drawParticles
 
-    if (regimeMode !== 'shell') {
+    if (drawParticles) {
       renderer.setRenderTarget(splat.depositTarget)
       renderer.setClearColor(0x000000, 0)
       renderer.clear()
@@ -2776,7 +2767,7 @@ if (!isWebGPUAvailable()) {
       renderer.autoClear = true
     }
 
-    await renderer.computeAsync([particles.resetKernel, particles.emitKernel, particles.finalizeKernel])
+    if (!primeDraw) await renderer.computeAsync(particleKernels)
   }
 
   renderer.setAnimationLoop(async () => {

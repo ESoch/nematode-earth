@@ -4,10 +4,11 @@ import { uniform } from 'three/tsl'
 import { buildMatterMaterial, SUN_DIR, type MatterOpts } from '../src/sweep/Matter'
 import { OPENING_POSE, ScaleCamera } from '../src/core/ScaleCamera'
 import { OpeningExperience } from '../src/core/openingExperience'
-import { Timeline } from '../src/sweep/Timeline'
+import { LAST_VISIBLE_LAYER_T, Timeline } from '../src/sweep/Timeline'
 import { createDissolveUniforms } from '../src/sweep/dissolveNodes'
 import { bakeSyntheticCubeTexture } from '../src/field/bakeCube'
 import matterSource from '../src/sweep/Matter.ts?raw'
+import viewerSource from '../src/viewer.ts?raw'
 
 // A throwaway cube texture: buildMatterMaterial only builds the TSL graph
 // here, it never samples GPU-side, so any correctly-typed CubeTexture
@@ -117,11 +118,24 @@ describe('the ocean-collapse beat: displacement decoupled from the discard', () 
     expect(matterSource).toMatch(/hypsometricColorNode\(elevation, landFraction, latDeg, vegIndex, oceanProgress\)/)
   })
 
-  it('gates the shading-normal exaggeration by land fraction too, not just displacement (spec 7.5)', () => {
-    // Marine relief must never be exaggerated - not just in displacement
-    // (which was already correct) but in the shading normal too, which
-    // used to receive opts.exaggeration unconditionally.
-    expect(matterSource).toMatch(/terrainNormalNode\(opts\.elevationTexture, dir, opts\.exaggeration, landFraction, opts\.texelAngularWidthRad\)/)
+  it('uses the same drain progress for relief lighting and remaining water reflections', () => {
+    expect(matterSource).toMatch(/terrainNormalNode\(\s*opts\.elevationTexture, dir, opts\.exaggeration, landFraction, oceanProgress,/)
+    expect(matterSource).toContain('float(1).sub(clamp(landFraction, 0, 1)).mul(float(1).sub(oceanProgress))')
+    expect(matterSource).toContain('mul(specIntensity).mul(sunTransmittance).mul(waterSurface)')
+  })
+})
+
+describe('solid-Earth visibility during a scrub', () => {
+  it('stops drawing once both opaque layers are gone and draws again after a rewind', () => {
+    expect(viewerSource).toContain('matter.visible = sweepState.frontWater < 1 || sweepState.frontRock < 1')
+    const timeline = new Timeline()
+    const edge = LAST_VISIBLE_LAYER_T
+    const times = [edge - 0.05, edge, edge + 1, edge - 0.05, 0]
+    const visible = times.map((t) => {
+      timeline.scrubTo(t)
+      return timeline.state.frontWater < 1 || timeline.state.frontRock < 1
+    })
+    expect(visible).toEqual([true, false, false, true, true])
   })
 })
 

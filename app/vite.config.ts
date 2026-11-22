@@ -9,6 +9,7 @@ const citedSources = new Map([
   ['/optical.ts.txt', resolve(__dirname, 'src/math/optical.ts')],
   ['/descent.ts.txt', resolve(__dirname, 'src/math/descent.ts')],
   ['/veilDither.test.ts.txt', resolve(__dirname, 'test/veilDither.test.ts')],
+  ['/rendering-checks.txt', resolve(__dirname, '../docs/rendering-checks.md')],
   ['/CITATION.cff', resolve(__dirname, '../CITATION.cff')],
 ])
 

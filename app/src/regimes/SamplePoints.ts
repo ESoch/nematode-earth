@@ -1,4 +1,5 @@
 import * as THREE from 'three/webgpu'
+import { attribute, convert, smoothstep, toneMappingExposure, uv } from 'three/tsl'
 import { WGS84 } from '../math/wgs84'
 import { latLonToDirection } from '../field/geoProbe'
 
@@ -170,17 +171,8 @@ export function surfaceNormal(pos: readonly [number, number, number]): [number, 
  * `camWorld` iff the camera sits on the outward side of the tangent plane
  * at `pointWorld`, i.e. `dot(camWorld - pointWorld, surfaceNormal) > 0`.
  *
- * This is the whole occlusion mechanism this module needs. `Shell.ts`'s
- * raymarch has `depthWrite = false` (it is a volumetric pass, not opaque
- * geometry), so there is no populated GPU depth buffer to depth-test
- * these points against -- a horizon test against the ellipsoid itself is
- * both necessary (the GPU depth buffer cannot do this job here) and
- * sufficient (it is exact for self-occlusion by the planet's own convex
- * body, for any camera above the surface, which every altitude in
- * `ScaleCamera`'s range satisfies). It does not account for terrain relief
- * or atmosphere -- points sit at height 0 on the reference ellipsoid, not
- * on the shaded terrain surface, so there is no elevation for it to occlude
- * against.
+ * Markers sit on the reference ellipsoid. Terrain exaggeration could bury
+ * a marker on land, so the overlay uses this horizon test for visibility.
  */
 export function isPointVisible(
   pointWorld: readonly [number, number, number],
@@ -198,7 +190,7 @@ export function isPointVisible(
 // ---------------------------------------------------------------------------
 
 export interface SamplePointsOpts {
-  /** Fixed on-screen size in pixels. Default 3. */
+  /** Fixed on-screen diameter in CSS pixels. Default 3. */
   pointSizePx?: number
   /** Colour for samples with any other biome code. Default amber. */
   otherColor?: THREE.ColorRepresentation
@@ -214,31 +206,14 @@ const DEFAULT_OPACITY = 0.85
 
 export interface SamplePointsLayer {
   /** Add this to the scene. Stays at the render origin -- see `update()`'s doc for why. */
-  points: THREE.Points
+  points: THREE.Sprite
   nSamples: number
   nOther: number
   nAntarctic: number
   /**
-   * Recomputes which points are visible from `camWorld` (the camera's TRUE
-   * planet-relative world position -- `ScaleCamera.worldPosition`, the
-   * same value `Shell.ts`'s `cameraWorldPosition` uniform gets) and
-   * rewrites the geometry's position/colour buffers, compacted so every
-   * visible point sits contiguously at the front -- `geometry.drawRange`
-   * is then narrowed to exactly that count, so occluded points are not
-   * drawn at all (not merely hidden), with no shader-side discard needed.
-   *
-   * Every sample's TRUE world position is precomputed once at
-   * construction; only the cheap per-frame parts (the horizon test and the
-   * small `worldPos - camWorld` subtraction) run here, in plain JS, once
-   * per point -- 6,825 iterations is trivial. The subtraction is done in
-   * JS's native f64 BEFORE the small residual is written into the f32
-   * geometry buffer, matching `ScaleCamera.worldToRender`'s doc ("subtract
-   * in f64, hand the small residual to the GPU") -- the two operands here
-   * (~6.4e6 m) individually carry sub-metre f32 error, so this subtraction
-   * must not happen on the GPU.
-   *
-   * Call this once per frame before rendering (only when this layer is
-   * visible and the camera has moved -- both left to the caller).
+   * Compacts visible sites into the front of the two instance buffers when
+   * the camera moves. Subtract the camera position in f64 before converting
+   * the small camera-relative coordinates to f32 for the GPU.
    */
   update(camWorld: readonly [number, number, number]): void
   dispose(): void
@@ -277,59 +252,47 @@ export function buildSamplePoints(
     sourceColors[i * 3 + 2] = c.b
   }
 
-  const geometry = new THREE.BufferGeometry()
-  const positionAttr = new THREE.Float32BufferAttribute(new Float32Array(n * 3), 3)
-  const colorAttr = new THREE.Float32BufferAttribute(new Float32Array(n * 3), 3)
-  positionAttr.setUsage(THREE.DynamicDrawUsage)
-  colorAttr.setUsage(THREE.DynamicDrawUsage)
-  geometry.setAttribute('position', positionAttr)
-  geometry.setAttribute('color', colorAttr)
-  geometry.setDrawRange(0, 0) // nothing drawn until the first update()
-
-  const material = new THREE.PointsMaterial({
+  // WebGPU's native point primitive always covers one device pixel.
+  // A single draw of camera-facing quads preserves the CSS-pixel diameter
+  // on high-DPI displays and lets the material antialias the circular edge.
+  const material = new THREE.PointsNodeMaterial({
     size: opts.pointSizePx ?? DEFAULT_POINT_SIZE_PX,
     sizeAttenuation: false,
-    vertexColors: true,
     transparent: true,
-    opacity: opts.opacity ?? DEFAULT_OPACITY,
-    depthWrite: false, // standard for blended sprites; avoids self-occlusion among overlapping points
-    /**
-     * Depth testing OFF, and the reason is a correction to this module's own
-     * reasoning above.
-     *
-     * `update()`'s doc argues that no GPU depth test is available because
-     * `Shell.ts` runs with `depthWrite = false`. That is true of the shell
-     * and irrelevant, because the shell is not the occluder. `sweep/Matter.ts`
-     * is OPAQUE (`material.transparent = false`, default depth write) and
-     * writing depth is precisely how the sweep occludes the veil — it is the
-     * mechanism spec 6.1's governing rule is built on.
-     *
-     * These points sit at exactly the reference ellipsoid radius, while
-     * matter's `positionNode` displaces land outward by `exaggerationAt()`,
-     * up to 3.6x real relief. Every sample on land is therefore BURIED inside
-     * the terrain and depth-rejected, which is why the layer rendered nothing
-     * at all until this was found. Nudging the points outward would need a
-     * fudge larger than Everest-times-3.6 and would still lose them in the
-     * Himalaya.
-     *
-     * Disabling the test is also the right behaviour on its own terms: this
-     * overlay answers "where did anyone actually sample", and a site does not
-     * stop being a site because a mountain is drawn in front of it. Far-side
-     * points are already removed by the exact horizon test, which is the cull
-     * that carries real meaning here.
-     */
+    depthWrite: false,
     depthTest: false,
+    alphaToCoverage: false,
   })
+  material.positionNode = attribute('sampleCenter', 'vec3')
+  // Site colours identify biomes. Keep them legible at the veil's high exposure.
+  const exposure = convert(toneMappingExposure, 'float') as THREE.Node<'float'>
+  material.colorNode = attribute<'vec3'>('sampleColor', 'vec3').div(exposure)
+  // Blend fractional edge coverage directly. A multisample coverage mask
+  // would stipple dense groups of overlapping, translucent markers.
+  const radius = uv().sub(0.5).length()
+  const halfPixel = radius.fwidth().mul(0.5)
+  const coverage = smoothstep(halfPixel.negate().add(0.5), halfPixel.add(0.5), radius).oneMinus()
+  material.opacityNode = coverage.mul(opts.opacity ?? DEFAULT_OPACITY)
 
-  const points = new THREE.Points(geometry, material)
-  // Geometry positions are written ALREADY camera-relative (render-space)
-  // by update() below -- the object itself never moves from the render
-  // origin, the same floating-origin convention Particles.ts's per-instance
-  // `records` buffer uses (see that file's doc: "xyz = render-space
-  // (camera-relative) position").
-  points.frustumCulled = false // this module's own horizon test is the cull; a stale/absent bounding sphere must not additionally hide points
+  const points = new THREE.Sprite(material)
+  // Sprite's default quad is shared. Keep the instance data and its
+  // disposal local to this layer.
+  const geometry = points.geometry.clone()
+  const positionAttr = new THREE.InstancedBufferAttribute(new Float32Array(n * 3), 3)
+  const colorAttr = new THREE.InstancedBufferAttribute(new Float32Array(n * 3), 3)
+  positionAttr.setUsage(THREE.DynamicDrawUsage)
+  colorAttr.setUsage(THREE.DynamicDrawUsage)
+  geometry.setAttribute('sampleCenter', positionAttr)
+  geometry.setAttribute('sampleColor', colorAttr)
+  points.geometry = geometry
+  points.count = 0
+  points.frustumCulled = false
+  const lastCamera = new THREE.Vector3(NaN, NaN, NaN)
 
   function update(camWorld: readonly [number, number, number]): void {
+    const [cx, cy, cz] = camWorld
+    if (cx === lastCamera.x && cy === lastCamera.y && cz === lastCamera.z) return
+    lastCamera.set(cx, cy, cz)
     const posArr = positionAttr.array as Float32Array
     const colArr = colorAttr.array as Float32Array
     let visible = 0
@@ -347,7 +310,7 @@ export function buildSamplePoints(
       colArr[slot * 3 + 1] = sourceColors[i * 3 + 1] ?? 0
       colArr[slot * 3 + 2] = sourceColors[i * 3 + 2] ?? 0
     }
-    geometry.setDrawRange(0, visible)
+    points.count = visible
     positionAttr.needsUpdate = true
     colorAttr.needsUpdate = true
   }

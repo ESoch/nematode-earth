@@ -191,12 +191,14 @@
           <li><strong>Density and coverage.</strong> One channel stores the logarithm of the
             average abundance across the cell. Another records the fraction with a valid
             prediction. A coastal cell’s average already accounts for partial coverage.
-            Where coverage is zero, the viewer leaves a gap. This includes the open ocean
+            The viewer converts the stored values back to optical depth before blending
+            neighbouring cells. Empty cells contribute zero. This includes the open ocean
             and the poles beyond the source’s 88° latitude limit.</li>
           <li><strong>Model uncertainty.</strong> The colour overlay summarizes variation
             across the source study’s bootstrap predictions. For each source pixel, the
             coefficient of variation is the standard deviation divided by the mean.
-            The display averages those coefficients over the supported area. Estimating
+            The display averages those coefficients over the supported area. An empty
+            ocean cell contributes no uncertainty estimate to a neighbouring coastal cell. Estimating
             uncertainty in the total population of a region would require a separate calculation.</li>
           <li><strong>Feeding groups.</strong> The data files also store the share of
             omnivores and predators among five separately modelled feeding groups. This
@@ -207,10 +209,12 @@
         <p>
           We checked how much the conversion changes the source total. Using the project’s
           spherical cell areas, the input integrates to about 4.615 × 10²⁰, roughly 4.9%
-          above the study’s central estimate. The density integral recovered using the viewer’s texel decoding
-          differs from the input integral by 0.056%. The smaller figure measures what the conversion preserves.
-          It says nothing about a prediction’s accuracy at a particular location.
-          <a href="/data/soil_plain_512_v2/cube_meta.json">Conversion checks and area convention</a>
+          above the study’s central estimate. Summing the values sent to the graphics
+          processor at the centres of all the display cells gives a total 0.009% above that
+          input. This checks how much the conversion preserves. Testing local ecological
+          predictions requires observations from the ground.
+          <a href="/data/soil_plain_512_v2/cube_meta.json">Atlas and source totals</a> ·
+          <a href="/sources/rendering-checks.txt">Rendering checks</a>.
         </p>
 
         <h3>Terrain and built-up land</h3>
@@ -268,7 +272,8 @@
           in the upper 15 cm. It tells us little about where each animal lies within that
           column. To draw the veil, the renderer combines the mapped abundance at each location
           with an invented vertical profile. Changing that profile changes the silhouette you
-          see from orbit. The source observations stay the same.
+          see from orbit. Once the last rock disappears, the far side of the veil gradually
+          appears through the near side. You can reverse the reveal with the scrubber.
           <a href="https://doi.org/10.1038/s41586-019-1418-6">Soil abundance study</a>.
         </p>
         <p>
@@ -304,8 +309,8 @@
           side. The nominal spacing is about 20 km, with a larger footprint near the middle
           of a face than at its corners. Smoothing between neighboring values helps the veil
           look continuous. Zoom stops before those cells fill the screen with apparent detail
-          that the soil map cannot resolve. The sample overlay places a fixed-size marker at
-          each published coordinate, so a high count in one sample does not enlarge its dot.
+          that the soil map cannot resolve. Each marker has a fixed diameter of three CSS pixels
+          at every zoom. A larger sample count does not produce a larger dot.
           <a href="/data/soil_plain_512_v2/cube_meta.json">Soil texture metadata</a> ·
           <a href="/data/nematode_samples_v2/samples_meta.json">Sample record layout</a>.
         </p>

@@ -12,6 +12,7 @@ const sources = {
   'optical.ts.txt': 'src/math/optical.ts',
   'descent.ts.txt': 'src/math/descent.ts',
   'veilDither.test.ts.txt': 'test/veilDither.test.ts',
+  'rendering-checks.txt': '../docs/rendering-checks.md',
   'CITATION.cff': '../CITATION.cff',
 }
 const temporary = []
@@ -42,7 +43,7 @@ test('production root is the exhibit, with a legacy alias and no GPU harness', a
   }
 })
 
-test('development serves the five cited originals as plain text', async () => {
+test('development serves the cited originals as plain text', async () => {
   const server = await createServer({
     root, logLevel: 'silent', server: { host: '127.0.0.1', port: 0, hmr: false },
   })

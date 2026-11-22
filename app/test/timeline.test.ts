@@ -2,8 +2,18 @@ import { describe, it, expect } from 'vitest'
 import {
   BEATS, T_END, SWEEP_T0, SWEEP_T1, COBB_LINE, SWEEP_STATE_KEYS,
   beatAt, matterAt, timeForMatter, stateAt, smootherstep01, Timeline,
-  clampTimelineDt, MAX_TIMELINE_DT_SEC,
+  clampTimelineDt, MAX_TIMELINE_DT_SEC, LAST_VISIBLE_LAYER_T, farWallVisibilityAt,
 } from '../src/sweep/Timeline'
+
+describe('far hemisphere reveal', () => {
+  it('starts when the last solid layer disappears and reaches full visibility by the hold', () => {
+    for (const t of [0, LAST_VISIBLE_LAYER_T, SWEEP_T1, T_END]) {
+      expect(farWallVisibilityAt(t)).toBe(t <= LAST_VISIBLE_LAYER_T ? 0 : 1)
+    }
+    expect(farWallVisibilityAt((LAST_VISIBLE_LAYER_T + SWEEP_T1) / 2)).toBeCloseTo(0.5)
+    expect(1 - farWallVisibilityAt(SWEEP_T1 - 0.01)).toBeLessThan(0.00001)
+  })
+})
 
 const samples = (n = 2001): number[] => Array.from({ length: n }, (_, i) => (i * T_END) / (n - 1))
 

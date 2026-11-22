@@ -8,6 +8,8 @@
 | Understand a value in a baked texture | [Data and metadata by layer](../app/public/data/) · [Soil extraction guide](../pipeline/fetch/CONSERVATIVE.md) |
 | Build, preview, or host the static site | [Release checklist](release-checklist.md) · [Cloudflare Pages deployment](deploy-cloudflare-pages.md) |
 
+For the current coastline filter, sample markers, ocean lighting and sweep measurements, see the [rendering checks](rendering-checks.md).
+
 ## Research and design records
 
 These dated records explain decisions made during development. The README and contributor guide describe the current exhibit and tooling.

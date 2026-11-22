@@ -7,6 +7,7 @@ import {
 } from '../src/field/loadCube'
 import { faceDirection } from '../src/field/bakeCube'
 import { E_A } from '../src/math/optical'
+import { WGS84 } from '../src/math/wgs84'
 
 // Real node built-ins through Vitest, with only the signatures this test uses.
 // The browser app intentionally has no dependency on node type declarations.
@@ -449,6 +450,7 @@ const v2Fixture = () => {
     schema: 'soil-cube-candidate-v2', field: 'density', projection: 'plain',
     face_size: 2, bytes_per_face: 32, total_bytes: 192,
     face_order: ['+X', '-X', '+Y', '-Y', '+Z', '-Z'],
+    validation: { diagnostics: { cv_support_difference_area_m2: 0 } },
     groups_policy: 'separate-coverage', face_sha256: primaryHashes,
     group_support: {
       format: 'R16Float', bytes_per_face: 8, total_bytes: 48,
@@ -560,9 +562,34 @@ describe('v2 soil loading and composition', () => {
       expect(probe.land).toBe(1)
       expect(DataUtils.fromHalfFloat(loaded.faces[0]![6]!)).toBe(0.5)
       const gpu = loaded.texture.images[0]!.image.data as Uint16Array
-      expect(Math.exp(DataUtils.fromHalfFloat(gpu[4]!)) / E_A).toBeCloseTo(64, 0)
+      const { scale } = loaded.texture.userData.soilFilter
+      const read = (i: number) => DataUtils.fromHalfFloat(gpu[i]!)
+      const expected = E_A * Math.exp(DataUtils.fromHalfFloat(loaded.faces[0]![4]!))
+      expect(read(4) / scale / expected).toBeCloseTo(1, 3)
+      // Different support, same area-mean density, including the .125-supported cell.
+      expect(read(0)).toBe(read(4))
+      expect(read(8)).toBe(read(4))
+      expect(read(12)).toBe(0)
+      // The hardware midpoint of a supported/empty pair gets half the density
+      // and retains the supported cell's CV, even with fractional support.
+      expect((read(8) + read(12)) / (2 * scale) / expected).toBeCloseTo(0.5, 3)
+      expect((read(10) + read(14)) / (read(11) + read(15))).toBe(1.5)
+      expect(read(3) / scale).toBe(0.5)
       expect(DataUtils.fromHalfFloat(gpu[9]!)).toBe(0.125)
-      expect(DataUtils.fromHalfFloat(gpu[10]!)).toBe(1.5)
+      expect(read(10) / scale).toBe(1.5 * 0.125)
+    } finally { disposeLoaded(loaded) }
+  })
+
+  it('preserves raw CV when the bake reports different coverage', async () => {
+    const fixture = v2Fixture()
+    fixture.meta.validation.diagnostics.cv_support_difference_area_m2 = 3
+    serveFixture(fixture)
+    const loaded = await loadCubeTexture('/candidate')
+    try {
+      const gpu = loaded.texture.images[0]!.image.data as Uint16Array
+      expect(loaded.texture.userData.soilFilter.cvUsesDensitySupport).toBe(false)
+      expect(gpu[10]).toBe(loaded.faces[0]![10])
+      expect(gpu[10]).toBe(DataUtils.toHalfFloat(1.5))
     } finally { disposeLoaded(loaded) }
   })
 
@@ -638,6 +665,20 @@ describe('v2 soil loading and composition', () => {
   })
 
   const candidateDir = new URL('../public/data/soil_plain_512_v2/', import.meta.url)
+  // Same geographic area convention as pipeline/build/soil_product.py.
+  // Sum center samples to check the GPU upload against the source integral.
+  function areaOfShippingTexel(face: number, pixel: number, size: number): number {
+    const pitch = 2 / size
+    const u = (pixel % size) * pitch - 1, v = Math.floor(pixel / size) * pitch - 1
+    const corner = (x: number, y: number) => Math.atan2(x * y, Math.sqrt(1 + x * x + y * y))
+    const solidAngle = corner(u + pitch, v + pitch) - corner(u, v + pitch) - corner(u + pitch, v) + corner(u, v)
+    const [x, y, z] = faceDirection(face, u + pitch / 2, v + pitch / 2)
+    const sin2 = z * z / (x * x + y * y + z * z)
+    const k2 = (1 - WGS84.f) ** 4
+    const jacobian = k2 / (k2 * (1 - sin2) + sin2) ** 1.5
+    return solidAngle * WGS84.R_MEAN ** 2 * jacobian
+  }
+
   it('loads the shipped 512 bundle through real hash/byte/channel validation', async () => {
     vi.stubGlobal('fetch', async (url: string) => {
       const name = url.slice(url.lastIndexOf('/') + 1)
@@ -650,14 +691,45 @@ describe('v2 soil loading and composition', () => {
     try {
       expect(loaded.meta.face_size).toBe(512)
       expect(loaded.groupSupportFaces).toHaveLength(6)
-      let missingGroupsWithDensity = 0
+      expect(loaded.texture.userData.soilFilter.cvUsesDensitySupport).toBe(true)
+      const scale = loaded.texture.userData.soilFilter.scale
+      let missingGroupsWithDensity = 0, supportedCells = 0, coastalPairs = 0
+      let maxCenterRelativeError = 0, maxCoastalCvError = 0, uploadIntegral = 0
       loaded.faces.forEach((face, f) => {
+        const gpu = loaded.texture.images[f]!.image.data as Uint16Array
         for (let pixel = 0; pixel < 512 * 512; pixel++) {
-          if (DataUtils.fromHalfFloat(face[pixel * 4 + 3]!) > 0
-            && DataUtils.fromHalfFloat(loaded.groupSupportFaces![f]![pixel]!) === 0) missingGroupsWithDensity++
+          const i = pixel * 4
+          if (face[i + 3] === 0) {
+            if (gpu[i] !== 0 || gpu[i + 2] !== 0 || gpu[i + 3] !== 0) throw new Error('Nonzero missing cell')
+            continue
+          }
+          supportedCells++
+          if (loaded.groupSupportFaces![f]![pixel] === 0) missingGroupsWithDensity++
+          const expectedTau = Math.exp(DataUtils.fromHalfFloat(face[i]!)) * E_A
+          const tau = DataUtils.fromHalfFloat(gpu[i]!) / scale
+          uploadIntegral += tau / E_A * areaOfShippingTexel(f, pixel, loaded.meta.face_size)
+          maxCenterRelativeError = Math.max(maxCenterRelativeError, Math.abs(tau / expectedTau - 1))
+          // For every supported/empty edge the empty tap has zero R/B/A.
+          // At its midpoint the density is half the supported tap and CV
+          // retains the supported tap's value, regardless of that cell's A.
+          const neighbors = [pixel % 512 ? i - 4 : -1, pixel % 512 < 511 ? i + 4 : -1,
+            pixel >= 512 ? i - 2048 : -1, pixel < 512 * 511 ? i + 2048 : -1]
+          const emptyNeighbors = neighbors.filter(n => n >= 0 && face[n + 3] === 0).length
+          if (emptyNeighbors) {
+            coastalPairs += emptyNeighbors
+            const cv = DataUtils.fromHalfFloat(gpu[i + 2]!) / DataUtils.fromHalfFloat(gpu[i + 3]!)
+            maxCoastalCvError = Math.max(maxCoastalCvError, Math.abs(cv - DataUtils.fromHalfFloat(face[i + 2]!)))
+          }
         }
       })
       expect(missingGroupsWithDensity).toBe(3631)
+      expect(supportedCells).toBe(456202)
+      expect(maxCenterRelativeError).toBeLessThan(2 ** -11)
+      expect(coastalPairs).toBe(33415)
+      expect(maxCoastalCvError).toBeLessThan(.00017)
+      const metadata = JSON.parse(new TextDecoder().decode(readFileSync(new URL('cube_meta.json', candidateDir))))
+      const percentDifference = (uploadIntegral / metadata.validation.source_integral - 1) * 100
+      expect(percentDifference).toBeCloseTo(.0089764, 6)
     } finally { disposeLoaded(loaded) }
   })
 })

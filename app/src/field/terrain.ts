@@ -172,33 +172,17 @@ export function hypsometricColor(
   return [lerp(ocean[0], land[0], t), lerp(ocean[1], land[1], t), lerp(ocean[2], land[2], t)]
 }
 
-// --- Vegetation as colour (density is a real productivity proxy) ----------
-//
-// `cube_plain_128`'s R channel (soil nematode density, decoded here as
-// `logTau` — see `field/loadCube.ts`'s `densityFaceToTauFace`, the exact
-// same quantity `regimes/Shell.ts` turns into the veil's optical depth)
-// tracks soil organic carbon and productivity: it is a genuine, measured
-// vegetation proxy, not an invented one. High density means boreal forest
-// or temperate cropland; low means desert. Driving the land's green-to-tan
-// axis from it (`landColor` above) is thematically exact, not just
-// visually convenient: THE SAME MEASUREMENT that colours the living world
-// here is the one that becomes the veil once matter dissolves away. When
-// the rock and water discard and only nematode density is left glowing,
-// what is left IS the thing that was colouring the land all along, seen
-// directly instead of through the proxy of green vs. tan. Keep this
-// function even if it looks like a trivial smoothstep wrapper worth
-// inlining — it is the one place that connects the two halves of the
-// piece, and losing that connection during a later cleanup would be a real
-// loss, not a simplification.
+// The land tint and veil use the same modeled soil density. The vegetation
+// ramp takes log optical depth; sampleLogTauNode decodes the bound texture.
 
-/** Below this logTau, land reads fully arid (`vegetationIndex` returns 0) — calibrated from the real extraction's land percentiles (`pipeline-report.md`: land density_per_sqm spans roughly p05=8.6e5 to p95=1.0e7 individuals/m²; converted to this atlas's logTau encoding via `+ln(E_A)`), a bit below the measured p05 so only the genuinely sparsest land clips to pure arid. */
+/** Below this logTau, land reads fully arid (`vegetationIndex` returns 0) — calibrated from the real extraction's land percentiles (`pipeline-report.md`: land density_per_sqm spans roughly p05=8.6e5 to p95=1.0e7 individuals/m²; converted to log optical depth via `+ln(E_A)`), a bit below the measured p05 so only the genuinely sparsest land clips to pure arid. */
 export const VEGETATION_ARID_LOG_TAU = -5.5
 /** Above this logTau, land reads fully lush — a bit above the measured p95 (see above), so only the genuinely densest land clips to pure lush. */
 export const VEGETATION_LUSH_LOG_TAU = -2.0
 
 /**
  * Continuous 0 (arid) .. 1 (lush) vegetation index from `logTau` (the
- * density cube's raw sampled value — see module doc). A smoothstep, not a
+ * logarithm of the sampled optical depth). A smoothstep, not a
  * threshold: real biome transitions (savanna into forest, steppe into
  * cropland) are gradients, and a hard cutoff would read as a data overlay
  * rather than terrain that happens to be greener where life is denser.
@@ -261,52 +245,22 @@ export function iceElevationLoweringM(latDeg: number): number {
 }
 
 /**
- * Vertex displacement along the surface normal, in metres.
- *
- * LAND is always shown at its full exaggerated relief (`k * elevationM`) —
- * it is part of "a recognisable planet" from frame zero, not something the
- * sweep animates into being.
- *
- * OCEAN is displaced by `elevationM * bathymetryProgress`: at
- * `bathymetryProgress = 0` the surface sits flat at datum (an ordinary-
- * looking sea, the cold open's ordinary Earth); at `1` it has dropped to
- * the true (unexaggerated — marine relief gets no `k`, spec 7.5's "treat
- * marine as its own profile class") seafloor depth, the collapse beat's
- * reveal. `Timeline.ts`'s `SweepState.bathymetry` ramps exactly across the
- * collapse beat's wall-clock window (9-13s), so driving displacement
- * directly from it makes the drop a real, data-driven animation timed to
- * that beat, not a separate hand-authored one.
+ * Vertical scale shared by terrain displacement and relief lighting.
+ * Land keeps its terrain exaggeration. As the water drains, ocean relief
+ * grows from a flat surface to the measured seafloor slope.
  */
+export function effectiveExaggeration(landFraction: number, exaggeration: number, bathymetryProgress = 1): number {
+  return lerp(clamp01(bathymetryProgress), exaggeration, clamp01(landFraction))
+}
+
+/** Radial displacement of a terrain vertex from sea level, in metres. */
 export function terrainDisplacementM(
   elevationM: number,
   landFraction: number,
   exaggeration: number,
   bathymetryProgress: number,
 ): number {
-  const land = elevationM * exaggeration
-  const ocean = elevationM * clamp01(bathymetryProgress)
-  return lerp(ocean, land, clamp01(landFraction))
-}
-
-/**
- * Exaggeration factor to apply to a fragment's SHADING-NORMAL slope, gated
- * by land fraction the same way `terrainDisplacementM` gates displacement:
- * exactly `exaggeration` on pure land, exactly 1 (unexaggerated) on pure
- * ocean, blended continuously in between.
- *
- * Marine relief must not be exaggerated ANYWHERE — not just in
- * displacement (spec 7.5) — and this is the fix for the case that slipped
- * through: `terrainNormalNode` used to multiply EVERY fragment's slope by
- * the land exaggeration factor unconditionally (no land/ocean gating at
- * all), so the seafloor's SHADING NORMAL — though never its actual
- * displaced position, `terrainDisplacementM`'s ocean term was already
- * correct — was lit as if bathymetry were exaggerated by `k`. Measured at
- * k=3.6 (`K_MAX`, `math/descent.ts`) essentially throughout the piece,
- * since the camera never descends below the ~192km altitude where
- * `exaggerationAt` starts backing off from its maximum.
- */
-export function effectiveExaggeration(landFraction: number, exaggeration: number): number {
-  return lerp(1, exaggeration, clamp01(landFraction))
+  return elevationM * effectiveExaggeration(landFraction, exaggeration, bathymetryProgress)
 }
 
 /**

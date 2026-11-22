@@ -209,11 +209,13 @@ describe('buildSamplePoints', () => {
     layer.dispose()
   })
 
-  it('exposes a THREE.Points ready to add to a scene', () => {
+  it('uses instanced sprites so WebGPU honours the configured marker diameter', () => {
     const layer = buildSamplePoints(samples)
-    expect(layer.points).toBeInstanceOf(THREE.Points)
-    expect(layer.points.geometry.getAttribute('position')).toBeDefined()
-    expect(layer.points.geometry.getAttribute('color')).toBeDefined()
+    expect(layer.points).toBeInstanceOf(THREE.Sprite)
+    expect(layer.points.material).toBeInstanceOf(THREE.PointsNodeMaterial)
+    expect(layer.points.count).toBe(0)
+    expect(layer.points.geometry.getAttribute('sampleCenter')).toBeDefined()
+    expect(layer.points.geometry.getAttribute('sampleColor')).toBeDefined()
     layer.dispose()
   })
 
@@ -222,9 +224,9 @@ describe('buildSamplePoints', () => {
     layer.update(camWorld)
 
     // Sample 1 (antipodal) is culled; samples 0 and 2 survive, in original order.
-    expect(layer.points.geometry.drawRange.count).toBe(2)
+    expect(layer.points.count).toBe(2)
 
-    const pos = layer.points.geometry.getAttribute('position').array as Float32Array
+    const pos = layer.points.geometry.getAttribute('sampleCenter').array as Float32Array
     const world0 = samplePosition(0, 0)
     const world2 = samplePosition(0, 5)
     expect(pos[0]).toBeCloseTo(world0[0] - camWorld[0], 1)
@@ -239,19 +241,29 @@ describe('buildSamplePoints', () => {
   it('update() re-culls on every call as the camera moves, not just once', () => {
     const layer = buildSamplePoints(samples)
     layer.update(camWorld)
-    expect(layer.points.geometry.drawRange.count).toBe(2)
+    expect(layer.points.count).toBe(2)
 
     // Move the camera to directly above the antipodal point instead.
     const camWorld2: [number, number, number] = [-(WGS84.a + ALT), 0, 0]
     layer.update(camWorld2)
-    expect(layer.points.geometry.drawRange.count).toBe(1) // only the antipodal sample now
+    expect(layer.points.count).toBe(1) // only the antipodal sample now
+    layer.dispose()
+  })
+
+  it('does not upload marker buffers again while the camera is stationary', () => {
+    const layer = buildSamplePoints(samples)
+    layer.update(camWorld)
+    const center = layer.points.geometry.getAttribute('sampleCenter') as THREE.InstancedBufferAttribute
+    const version = center.version
+    layer.update([...camWorld])
+    expect(center.version).toBe(version)
     layer.dispose()
   })
 
   it('colours points by Antarctic or other biome code', () => {
     const layer = buildSamplePoints(samples, { otherColor: 0xff0000, antarcticColor: 0x00ff00 })
     layer.update(camWorld)
-    const col = layer.points.geometry.getAttribute('color').array as Float32Array
+    const col = layer.points.geometry.getAttribute('sampleColor').array as Float32Array
     // slot 0 = sample 0 (biome 4, red), slot 1 = sample 2 (biome 25, green)
     expect(col[0]).toBeCloseTo(1, 5)
     expect(col[1]).toBeCloseTo(0, 5)
@@ -267,8 +279,9 @@ describe('buildSamplePoints', () => {
     // through DecodedSample -- confirm no size attribute exists.
     const layer = buildSamplePoints(samples)
     expect(layer.points.geometry.getAttribute('size')).toBeUndefined()
-    const material = layer.points.material as THREE.PointsMaterial
-    expect(typeof material.size).toBe('number')
+    const material = layer.points.material as THREE.PointsNodeMaterial
+    expect(material.size).toBe(3)
+    expect(material.sizeAttenuation).toBe(false)
     layer.dispose()
   })
 })

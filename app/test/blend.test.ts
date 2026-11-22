@@ -1,7 +1,8 @@
+import { WGS84 } from '../src/math/wgs84'
 import { describe, it, expect } from 'vitest'
 import {
   REGIME2_TOP_ALT, REGIME2_FULL_ALT, handoffWeight, shellShare, instanceShare,
-  windowTaper, partitionAt,
+  windowTaper, partitionAt, particleWindowIntersectsShell,
 } from '../src/regimes/Blend'
 import { saturationCapTau, E_A, sigma0 } from '../src/math/optical'
 import { scaleHeightAt } from '../src/math/descent'
@@ -15,6 +16,17 @@ describe('the regime-2 band is DERIVED from the tau cap, not chosen', () => {
   })
   it('completes one decade lower', () => {
     expect(REGIME2_FULL_ALT).toBeCloseTo(REGIME2_TOP_ALT / 10, 6)
+  })
+})
+
+describe('particle visibility', () => {
+  it('skips the particle window when even its nearest point is above the shell', () => {
+    expect(particleWindowIntersectsShell(WGS84.a + 300_000, 50_000, 64_000)).toBe(false)
+  })
+
+  it('keeps a window touching the outer shell or containing points at lower altitude', () => {
+    expect(particleWindowIntersectsShell(WGS84.a + 114_000, 50_000, 64_000)).toBe(true)
+    expect(particleWindowIntersectsShell(WGS84.b + 8_000, 4_000, 32_000)).toBe(true)
   })
 })
 

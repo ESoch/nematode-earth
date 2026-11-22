@@ -95,6 +95,11 @@ const WIN = {
 /** The rock front's last visible fragment, before the settled veil beat. */
 export const LAST_VISIBLE_LAYER_T = SWEEP_T0 + WIN.rock[1] * (SWEEP_T1 - SWEEP_T0)
 
+/** Bring the far hemisphere into view during the settle after the last solid fragment. */
+export function farWallVisibilityAt(t: number): number {
+  return ramp(t, LAST_VISIBLE_LAYER_T, SWEEP_T1)
+}
+
 /** Normalized progress through the sweep span [SWEEP_T0, SWEEP_T1]. */
 export function sweepProgress(t: number): number {
   return clamp01((t - SWEEP_T0) / (SWEEP_T1 - SWEEP_T0))

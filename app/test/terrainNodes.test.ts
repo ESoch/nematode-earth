@@ -87,13 +87,13 @@ describe('hypsometricColorNode / terrainNormalNode node construction', () => {
     )).not.toThrow()
   })
 
-  it('terrainNormalNode takes a landFraction parameter (arity 5, was 4)', () => {
-    expect(terrainNormalNode.length).toBe(5)
+  it('terrainNormalNode takes bathymetry as well as the land fraction', () => {
+    expect(terrainNormalNode.length).toBe(6)
   })
 
-  it('terrainNormalNode builds with a landFraction node without throwing', () => {
+  it('terrainNormalNode builds with the coast and bathymetry controls', () => {
     const fakeCube = bakeSyntheticCubeTexture({ size: 2 })
-    expect(() => terrainNormalNode(fakeCube, vec3(1, 0.2, 0.3), float(3.6), float(0.5), 0.01)).not.toThrow()
+    expect(() => terrainNormalNode(fakeCube, vec3(1, 0.2, 0.3), float(3.6), float(0.5), float(0.25), 0.01)).not.toThrow()
   })
 })
 

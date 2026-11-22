@@ -61,6 +61,15 @@ export const REGIME2_FULL_ALT = REGIME2_TOP_ALT / 10
 const clamp01 = (v: number): number => Math.min(Math.max(v, 0), 1)
 const smooth = (u: number): number => u * u * (3 - 2 * u)
 
+/**
+ * Every potentially visible particle must lie in both the camera's emission
+ * window and the shell. The equatorial radius encloses the oblate shell at
+ * every latitude, so this test can safely skip disjoint volumes.
+ */
+export function particleWindowIntersectsShell(cameraRadius: number, windowRadius: number, shellHeight: number): boolean {
+  return cameraRadius - windowRadius <= WGS84.a + shellHeight
+}
+
 /** Handoff ramp, log-linear in altitude across the derived band. */
 export function handoffWeight(altM: number): number {
   if (altM >= REGIME2_TOP_ALT) return 0

@@ -133,6 +133,14 @@ describe('hypsometricColor ocean-progress gating (the collapse beat)', () => {
 })
 
 describe('effectiveExaggeration', () => {
+  it('reveals seafloor slopes as the water drains and restores the flat sea when rewound', () => {
+    for (const progress of [0, 0.25, 0.5, 1, 0.5, 0]) {
+      expect(effectiveExaggeration(0, 3.6, progress)).toBe(progress)
+      expect(effectiveExaggeration(1, 3.6, progress)).toBeCloseTo(3.6, 12)
+      expect(effectiveExaggeration(0.5, 3.6, progress)).toBeCloseTo((progress + 3.6) / 2, 12)
+    }
+  })
+
   it('is exactly 1 (unexaggerated) at landFraction 0 - marine relief never gets k (spec 7.5)', () => {
     expect(effectiveExaggeration(0, 3.6)).toBeCloseTo(1, 12)
   })

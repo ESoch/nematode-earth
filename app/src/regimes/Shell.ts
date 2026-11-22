@@ -9,7 +9,7 @@ import {
   veilDitherScaleNode,
 } from '../field/terrainNodes'
 import { cubeFaceSize } from '../field/loadCube'
-import { supportedAreaMeanNode } from '../field/densityCoverage'
+import { filteredCvNode, filteredSupportNode, filteredTauNode, supportedAreaMeanNode } from '../field/densityCoverage'
 import { geographicCubeTexture as cubeTexture } from '../field/geographicCube'
 
 export interface ShellFieldOpts {
@@ -31,12 +31,8 @@ export interface ShellFieldOpts {
 
 export interface ShellCubeOpts {
   /**
-   * Baked cube texture, RGBA16Float end to end: R holds natural-log-encoded
-   * tau (see `field/bakeCube.ts`'s `encodeLogTau`/`decodeLogTau`), A holds
-   * valid-model area fraction (`pipeline/build/bake_cube.py`) - 0 over open
-   * ocean and the polar no-data gap, where R decodes to a numerical-
-   * stability floor rather than a real measurement. `stepSigma0` reads
-   * both - see its cube branch's doc for why.
+   * Plain geographic density cube. The texture's encoding selects linear
+   * soil-v2 optical depth or the legacy/synthetic log-depth representation.
    */
   texture: THREE.CubeTexture
   /** Same meaning as `ShellFieldOpts.sigma0PerTau` — see its doc. */
@@ -230,32 +226,10 @@ export interface ShellPartitionOpts {
 }
 
 export interface ShellFarWallOpts {
-  /**
-   * True only when it is physically valid to march the far wall. Computed
-   * on the CPU each frame (`viewer.ts`) from two independent conditions,
-   * ANDed together - neither one alone is sufficient:
-   *
-   * 1. Matter (the opaque terrain mesh, `sweep/Matter.ts`) has fully
-   *    dissolved - `sweep/Timeline.ts`'s `SweepState.matter <= 0`. While
-   *    matter exists it genuinely occludes the far wall (the same solid
-   *    Earth spec 7.3 assumed when it said "let the terrain depth-clip
-   *    terminate the march" - see this file's module doc for the update),
-   *    so marching it anyway would both waste GPU work and add light that
-   *    is physically blocked. `matter` is scrub-aware, not a wall-clock
-   *    threshold - it tracks wherever the sweep timeline actually is, so a
-   *    user scrubbing back into the erosion beat correctly loses the far
-   *    wall again.
-   * 2. Altitude is at or above `regimes/Blend.ts`'s `REGIME2_TOP_ALT` - the
-   *    SAME condition that makes `ShellPartitionOpts.shellFraction` exactly
-   *    1 (unpartitioned). Below that, the Nelson Max shell/instance split
-   *    assumes exactly one column of density per direction; the far wall
-   *    has no corresponding regime-2 instance accounting, so adding it
-   *    inside the partition band would over-weight the shell by up to ~2x
-   *    across roughly 3.3-33 km altitude. Tying this to `shellFraction`
-   *    itself (rather than a separate altitude comparison) means the two
-   *    conditions cannot drift apart.
-   */
+  /** The solid globe has dissolved and the shell has its full share of the optical depth. */
   enabled: THREE.UniformNode<'bool', boolean>
+  /** Display transition from zero to the full far-side column. Probes default to full visibility. */
+  visibility?: THREE.UniformNode<'float', number>
 }
 
 type FloatNode = THREE.Node<'float'>
@@ -344,22 +318,12 @@ function stepSigma0(opts: ShellOpts, worldDirection: Vec3Node, probe?: StepProbe
     // for the derivation, including why this cannot open a face seam.
     const dir = smoothstepCubeDirectionNode(worldDirection, cubeFaceSize(texture))
     const cubeSample = cubeTexture(texture, dir).level(float(0))
-    const logTau = cubeSample.r
-    const tauSampled = applyCobbMix(exp(logTau), worldDirection, opts.urban) // mirrors field/bakeCube.ts's decodeLogTau
-    // A is valid soil-model coverage, NOT an independent ocean mask. R is
-    // already an ALL-CELL area mean: half-valid density 100 becomes 50
-    // upstream. Multiplying by A again would incorrectly make it 25.
-    // Only exactly unsupported samples are suppressed here, so the log(0)
-    // sentinel contributes nothing regardless of the chosen floor. This
-    // does not assert marine absence or make 1-A eligible for marine fill.
-    const landFraction = clamp(cubeSample.a, 0, 1)
-    // B: the per-pixel bootstrap coefficient of variation (van den Hoogen
-    // et al. 2019, 100 stratified iterations) — real model uncertainty,
-    // read off the SAME RGBA fetch as R and A, so the overlay costs no
-    // extra texture bandwidth in the hottest loop in the piece. `.b` is
-    // raw and unencoded: loadCube.ts's tau re-encode touches only R.
+    // V2 R is the all-cell area mean, with unsupported taps set to zero
+    // before filtering. Applying A again would count missing area twice.
+    const tauSampled = applyCobbMix(filteredTauNode(texture, cubeSample.r), worldDirection, opts.urban)
+    const landFraction = clamp(filteredSupportNode(texture, cubeSample.a), 0, 1)
     if (probe) {
-      probe.cv.assign(cubeSample.b)
+      probe.cv.assign(filteredCvNode(texture, cubeSample.b, cubeSample.a))
       probe.land.assign(landFraction)
     }
     return sigma0FromTau(supportedAreaMeanNode(tauSampled, landFraction), sigma0PerTau, tauCap, opts.partition?.shellFraction)
@@ -390,7 +354,11 @@ function marchSegment(
   tEnterX: FloatNode, dt: FloatNode,
   col: Vec3Node, transmittance: FloatNode,
   uncertainty?: UncertaintyAccum,
+  visibility?: FloatNode,
 ): void {
+  // Change only optical depth during the reveal. Sample the same geographic
+  // locations at every frame, with the same midpoint spacing on both walls.
+  const opticalStep = visibility ? dt.mul(visibility).toVar() : dt
   // One scratch pair per segment, reused every step — see StepProbe's doc.
   const probe: StepProbe | undefined = uncertainty
     ? { cv: float(0).toVar(), land: float(0).toVar() }
@@ -418,7 +386,7 @@ function marchSegment(
     const taper = float(1.0).sub(smoothstep(opts.Hmax.sub(opts.Hs), opts.Hmax, z))
     const sigma = density.mul(taper)
 
-    const stepT = exp(sigma.mul(dt).negate())
+    const stepT = exp(sigma.mul(opticalStep).negate())
     const contribution = transmittance.mul(float(1.0).sub(stepT))
     col.addAssign(contribution)
     if (uncertainty && probe) {
@@ -562,7 +530,7 @@ export function buildShellMaterial(opts: ShellOpts): THREE.NodeMaterial {
         // whatever transmittance the near wall left behind would render a
         // segment that was never actually there).
         If(discIn.greaterThan(0.0).and(opts.farWall.enabled), () => {
-          marchSegment(opts, ro, rd, invA, invB, tEnter2, dt, col, transmittance, uncertainty)
+          marchSegment(opts, ro, rd, invA, invB, tEnter2, dt, col, transmittance, uncertainty, opts.farWall?.visibility)
         })
       }
 
