@@ -866,7 +866,7 @@ if (!isWebGPUAvailable()) {
   const about = document.createElement('a')
   about.className = 'hud-about'
   about.href = ABOUT_LINK_HREF
-  about.hash = 'claim'
+  about.hash = 'city-comparison'
   about.textContent = ABOUT_LINK_TEXT
   finding.append(
     el('div', 'hud-finding-lede', HUD_COPY.findingPrediction),

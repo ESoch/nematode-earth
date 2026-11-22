@@ -13,7 +13,7 @@ Play or scrub the opening to sweep away air, water, and rock. Drag to orbit, the
 | Layer or control | How to read it |
 | --- | --- |
 | Soil veil | Light traces the predicted number of nematodes in the top 15 cm of soil. The height, color, and exposure of the veil are visual choices. Gaps in the oceans and near the poles mark the limits of the model. [2019 study](https://doi.org/10.1038/s41586-019-1418-6) |
-| Sample sites | Each marker locates one of 6,825 soil samples in the 2020 data release. Several samples can share a location. [Data paper](https://doi.org/10.1038/s41597-020-0437-3) · [Sample records](https://doi.org/10.6084/m9.figshare.11733897.v1) |
+| Sample locations | Each marker locates one of 6,825 soil samples in the 2020 data release. Several samples can share a location. [Data paper](https://doi.org/10.1038/s41597-020-0437-3) · [Sample records](https://doi.org/10.6084/m9.figshare.11733897.v1) |
 | Model uncertainty | Color shows how much the source model’s predictions vary across repeated bootstrap fits. Each display cell averages that measure across its supported area. [Abundance and uncertainty rasters](https://doi.org/10.3929/ethz-b-000354035) |
 | Terrain and cities | NOAA elevation gives the globe its relief. The **Cobb illustration** uses EU built-up surface data to scale the density used for display, up to four times the soil model’s value on fully built-up ground. The project chose that multiplier. [ETOPO 2022](https://doi.org/10.25921/fd45-gt74) · [GHS-BUILT-S](https://doi.org/10.2905/9F06F36F-4B11-47EC-ABB0-4F8B7B1D72EA) |
 
