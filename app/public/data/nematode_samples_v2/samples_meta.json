@@ -1,0 +1,173 @@
+{
+  "description": "Soil nematode sample records from the 2020 dataset. Each point marks the reported location of one sample.",
+  "n_samples": 6825,
+  "format": "packed binary, little-endian, no padding, one 13-byte record per sample in source-CSV row order",
+  "record_bytes": 13,
+  "total_bytes": 88725,
+  "field_order": [
+    "latitude_deg",
+    "longitude_deg",
+    "total_per_100g_dry_soil",
+    "biome_index"
+  ],
+  "field_layout": {
+    "latitude_deg": {
+      "offset": 0,
+      "type": "float32",
+      "units": "decimal degrees, WGS84"
+    },
+    "longitude_deg": {
+      "offset": 4,
+      "type": "float32",
+      "units": "decimal degrees, WGS84"
+    },
+    "total_per_100g_dry_soil": {
+      "offset": 8,
+      "type": "float32",
+      "units": "nematode individuals per 100 g dry soil",
+      "source_column": "Total_Number"
+    },
+    "biome_index": {
+      "offset": 12,
+      "type": "uint8",
+      "note": "round(WWF_Biome) with the authors' Antarctica override applied (latitude < -60 deg forces code 25); UNFILTERED -- includes the two non-terrestrial codes (0, 98) that the biome_summary table below excludes. See biome_legend."
+    }
+  },
+  "decode_note": "13 is not a multiple of 4, so records are NOT Float32Array-alignable across the whole buffer -- decode per-record with DataView (getFloat32/getUint8 at record_index*13 + field offset), not a strided typed-array view.",
+  "biome_legend": {
+    "0": "No biome match",
+    "1": "Tropical Moist Forests",
+    "2": "Tropical Dry Forests",
+    "3": "Tropical Coniferous Forests",
+    "4": "Temperate Broadleaf Forests",
+    "5": "Temperate Conifer Forests",
+    "6": "Boreal Forests",
+    "7": "Tropical Grasslands",
+    "8": "Temperate Grasslands",
+    "9": "Flooded Grasslands",
+    "10": "Montane Grasslands",
+    "11": "Tundra",
+    "12": "Mediterranean Forests",
+    "13": "Deserts",
+    "25": "Antarctica",
+    "98": "Lake"
+  },
+  "biome_summary": [
+    {
+      "biome": "Tundra",
+      "biome_code": 11,
+      "mean": 7297.9825190472975,
+      "median": 2695.12,
+      "n": 148
+    },
+    {
+      "biome": "Temperate Broadleaf Forests",
+      "biome_code": 4,
+      "mean": 4464.771271095793,
+      "median": 2120.0,
+      "n": 2175
+    },
+    {
+      "biome": "Boreal Forests",
+      "biome_code": 6,
+      "mean": 3958.8547716995517,
+      "median": 2016.0,
+      "n": 669
+    },
+    {
+      "biome": "Montane Grasslands",
+      "biome_code": 10,
+      "mean": 6095.793103448276,
+      "median": 1120.5,
+      "n": 116
+    },
+    {
+      "biome": "Tropical Coniferous Forests",
+      "biome_code": 3,
+      "mean": 999.75,
+      "median": 970.0,
+      "n": 8
+    },
+    {
+      "biome": "Temperate Conifer Forests",
+      "biome_code": 5,
+      "mean": 1800.321789499367,
+      "median": 670.5,
+      "n": 158
+    },
+    {
+      "biome": "Tropical Grasslands",
+      "biome_code": 7,
+      "mean": 863.4057352941177,
+      "median": 657.0,
+      "n": 272
+    },
+    {
+      "biome": "Tropical Moist Forests",
+      "biome_code": 1,
+      "mean": 913.6052300023895,
+      "median": 601.0,
+      "n": 968
+    },
+    {
+      "biome": "Temperate Grasslands",
+      "biome_code": 8,
+      "mean": 945.4462519936204,
+      "median": 565.3,
+      "n": 627
+    },
+    {
+      "biome": "Tropical Dry Forests",
+      "biome_code": 2,
+      "mean": 430.09090909090907,
+      "median": 431.0,
+      "n": 11
+    },
+    {
+      "biome": "Mediterranean Forests",
+      "biome_code": 12,
+      "mean": 619.3571733739532,
+      "median": 374.1167413,
+      "n": 704
+    },
+    {
+      "biome": "Flooded Grasslands",
+      "biome_code": 9,
+      "mean": 183.28571428571428,
+      "median": 124.0,
+      "n": 7
+    },
+    {
+      "biome": "Antarctica",
+      "biome_code": 25,
+      "mean": 2244.598648111332,
+      "median": 89.0,
+      "n": 503
+    },
+    {
+      "biome": "Deserts",
+      "biome_code": 13,
+      "mean": 192.90415512465373,
+      "median": 44.0,
+      "n": 361
+    }
+  ],
+  "license": "CC0",
+  "source": {
+    "dataset_citation": "Geisen, S., van den Hoogen, J., Data Providers, and Crowther, T. (2020). Nematode_abundance_dataset, version 1. Figshare.",
+    "citation": "van den Hoogen, J. et al. A global database of soil nematode abundance and functional group composition. Scientific Data 7:103 (2020). doi:10.1038/s41597-020-0437-3",
+    "collection_doi": "10.6084/m9.figshare.c.4718003",
+    "full_dataset_doi": "10.6084/m9.figshare.11733897",
+    "full_dataset_version_doi": "10.6084/m9.figshare.11733897.v1",
+    "source_csv_md5": "9414fbdebce2340ae649851106c6c5a1",
+    "license_full": "CC0 1.0 Universal (Public Domain Dedication)",
+    "license_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+    "provenance_note": "The full dataset item containing the source CSV carries the CC0 dedication. The collection DOI identifies its enclosing collection."
+  },
+  "caveats": [
+    "Point coordinates locate samples. Estimating the fraction of land sampled would require information on the area each sample covered.",
+    "Extraction methods differ in how many nematodes they recover. This affects measured abundance. Model predictions also have estimation error.",
+    "Sampling effort varies across biomes. The biome summary reports the number of sample records per included biome.",
+    "The 2019 study compiled 6,759 samples, aggregated them by pixel, and used 1,876 pixels for geospatial modelling after excluding 39 Antarctic pixels. This separate 2020 release contains 6,825 records. A biome code describes location and cannot establish whether an individual record contributed to the earlier model."
+  ]
+}

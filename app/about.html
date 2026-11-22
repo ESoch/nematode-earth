@@ -1,0 +1,547 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Science &amp; methods · Nematode Earth</title>
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Nematode Earth — science &amp; methods" />
+    <meta property="og:description" content="How soil samples and a global abundance model become a globe of nematodes." />
+    <meta
+      name="description"
+      content="How soil samples and a global abundance model become a globe of nematodes. Explore the data, visual choices, sources, and reuse terms."
+    />
+    <style>
+      :root {
+        color-scheme: dark;
+        --ground: #04060a;
+        --heading: #e6f0f7;
+        --body: #bdcbd5;
+        --muted: #9daebb;
+        --rule: #39434f;
+        --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      }
+      *, *::before, *::after { box-sizing: border-box; }
+      html { background: var(--ground); -webkit-text-size-adjust: 100%; }
+      body {
+        margin: 0;
+        color: var(--body);
+        font: 1rem/1.65 Inter, system-ui, sans-serif;
+        overflow-wrap: break-word;
+      }
+      .wrap { max-width: 72ch; margin-inline: auto; padding-inline: clamp(1.1rem, 4vw, 2rem); }
+      .topbar { padding-block: 1.15rem; border-bottom: 1px solid var(--rule); }
+      .topbar .wrap { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+      .wordmark, .backlink { font: 0.8rem/1.5 var(--mono); }
+      .wordmark { color: var(--heading); letter-spacing: 0.05em; }
+      main { padding-block-start: clamp(2.5rem, 7vw, 5rem); }
+      h1, h2, h3 { color: var(--heading); font-family: var(--mono); line-height: 1.3; }
+      h1 { font-size: clamp(1.65rem, 4vw, 2.25rem); margin: 0 0 1.25rem; }
+      h2 { font-size: clamp(1.25rem, 3vw, 1.5rem); margin: 0 0 1.25rem; }
+      h3 { font-size: 1.05rem; margin: 2rem 0 0.55rem; }
+      p { margin: 0 0 1.1rem; }
+      .lede { font-size: 1.12rem; }
+      a { color: var(--heading); text-decoration-color: #6e8394; text-underline-offset: 0.18em; }
+      a:hover { text-decoration-color: currentColor; }
+      :focus-visible { outline: 2px solid var(--heading); outline-offset: 3px; }
+      .toc { margin: 2rem 0; }
+      .toc ul { list-style: none; padding: 0; display: grid; gap: 0.35rem 1.25rem; }
+      @media (min-width: 40rem) { .toc ul { grid-template-columns: repeat(2, 1fr); } }
+      section { border-top: 1px solid var(--rule); margin-top: 2.5rem; padding-top: 1.5rem; }
+      [id] { scroll-margin-top: 1rem; }
+      strong { color: var(--heading); }
+      ul { padding-left: 1.35rem; margin: 0 0 1.25rem; }
+      li { margin-bottom: 0.45rem; }
+      blockquote { margin: 1.25rem 0; border-left: 2px solid var(--muted); padding-left: 1.1rem; }
+      blockquote p { font-size: 1.12rem; color: var(--heading); margin-bottom: 0.4rem; }
+      cite { color: var(--muted); font-size: 0.9rem; }
+      code, pre { font-family: var(--mono); }
+      code { font-size: 0.88em; overflow-wrap: anywhere; }
+      details { border-top: 1px solid var(--rule); padding-block: 0.7rem; }
+      summary { cursor: pointer; color: var(--heading); }
+      pre { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 0.85rem; }
+      footer { border-top: 1px solid var(--rule); margin-top: 3rem; padding: 1.5rem 0 3rem; }
+      @media (prefers-reduced-motion: no-preference) {
+        html { scroll-behavior: smooth; }
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="topbar">
+      <div class="wrap">
+        <span class="wordmark">Nematode Earth</span>
+        <a class="backlink" href="/viewer.html">&larr; Back to the globe</a>
+      </div>
+    </div>
+
+    <main class="wrap">
+      <h1>Science &amp; methods</h1>
+      <div class="lede">
+        <p>Once the air, water, and rock fade, the globe shows a thin veil. Its brightness begins
+          with an estimate of how many nematodes live in the soil below. You can compare that
+          prediction with the places researchers actually sampled.</p>
+      </div>
+      <nav class="toc" aria-label="Contents">
+        <ul>
+          <li><a href="#claim">Cobb’s thought experiment</a></li>
+          <li><a href="#data">Where the data come from</a></li>
+          <li><a href="#rendering">How the globe is drawn</a></li>
+          <li><a href="#wrong">What changed in testing</a></li>
+          <li><a href="#colophon">Software and delivery</a></li>
+          <li><a href="#references">Research references</a></li>
+          <li><a href="#credits">Credits &amp; rights</a></li>
+        </ul>
+      </nav>
+
+      <section id="claim">
+        <h2>Cobb’s thought experiment</h2>
+        <blockquote>
+          <p>if all the matter in the universe except the nematodes were swept away, our world would still be dimly recognizable</p>
+          <cite>Nathan A. Cobb, <a href="https://archive.org/details/yoa1914/page/472/mode/2up">USDA Yearbook 1914, p. 472</a>, published in 1915</cite>
+        </blockquote>
+        <p>
+          Cobb imagined a film tracing mountains and oceans. He thought towns might stand out
+          because people would bring certain nematodes together. We can explore part of that
+          idea with a modern soil map. It predicts how many animals live in the topsoil.
+          To turn that number into light, the exhibit has to choose how large their silhouettes
+          would look and how they would overlap.
+        </p>
+        <p>
+          Take a single column with optical depth 0.04. If opaque silhouettes fall at random,
+          the expected fraction of the view they cover is 1 − exp(−0.04), about <strong>3.9%</strong>.
+          That is an example from the rendering model. A global average would require doing
+          the calculation across the map and weighting each patch by its area.
+          The viewer also increases exposure so you can see the differences.
+        </p>
+
+        <h3>Would towns stand out?</h3>
+        <p>
+          We compared two published maps across twenty cities. Within a one-degree square
+          around each city, we matched predicted soil abundance to the fraction of each cell
+          covered by buildings. We divided each prediction by the average in nearby cells with
+          less than 2% built-up cover. This gave every city its own local reference.
+          <a href="https://doi.org/10.3929/ethz-b-000354035">ETH soil predictions</a> ·
+          <a href="https://data.jrc.ec.europa.eu/dataset/9f06f36f-4b11-47ec-abb0-4f8b7b1d72ea">JRC built-up surface</a>
+        </p>
+        <p>
+          We trimmed the highest and lowest 0.5% of the pooled abundance ratios. Across the
+          remaining <strong>243,294 mapped pixels</strong>, our fitted curve did slightly
+          worse than predicting the mean (R² = −0.0003). The curve was
+          <code>1 + a·u + b·u²</code>, where <code>u</code> is built-up fraction. Its linear
+          coefficient was −0.0085, with a nominal 95% interval of −0.035 to +0.019.
+          That interval describes <code>a</code> alone. It comes from resampling individual
+          pixels, although nearby pixels share geography and each city shares a reference value.
+          The comparison gave us no basis for adding a fixed city effect to the soil map.
+          <a href="/sources/city_calibration.py.txt">Project calculation (Python)</a>.
+        </p>
+        <p>
+          In the viewer, <strong>Soil model</strong> leaves the published predictions alone.
+          <strong>Cobb illustration</strong> scales the density used for display by
+          <code>1 + 3u</code>, reaching four times the modelled density on fully built-up
+          ground. We chose that multiplier. Cobb gave no numerical estimate.
+        </p>
+        <p>
+          Field studies can ask questions that these two maps cannot. Li and colleagues
+          estimated 27% higher total abundance in urban soil than in primary habitat,
+          but the urban total did not differ significantly across those land-use comparisons.
+          Gong and colleagues found a smaller <em>share</em> of predators and omnivores in
+          urban soils in a study that included paired sites in twelve Chinese cities.
+          A change in the mix of feeding groups can occur even if the total stays similar.
+          <a href="https://doi.org/10.1111/1365-2656.13744">Li et al. (2022), results and Fig. S4</a> ·
+          <a href="https://doi.org/10.1016/j.soilbio.2023.109297">Gong et al. (2024)</a>
+        </p>
+      </section>
+
+      <section id="data">
+        <h2>Where the data come from</h2>
+        <h3 id="soil-candidate-status">From soil samples to a global field</h3>
+        <p>
+          Van den Hoogen and colleagues compiled 6,759 soil samples and used environmental
+          data to predict abundance in the top 15 cm of soil. They aggregated samples by map
+          pixel and excluded 39 Antarctic pixels where environmental data were incomplete.
+          The remaining 1,876 pixels supplied the geospatial model. The authors estimated
+          <strong>(4.4 ± 0.64) × 10²⁰ nematodes</strong> in surface soils worldwide.
+          <a href="https://doi.org/10.1038/s41586-019-1418-6">2019 study</a> ·
+          <a href="https://nemaplex.ucdavis.edu/FerrisPublications/pdf%20files/213%20Hoogen_et_al-2019-Nature.pdf">Authors’ copy with methods</a>
+        </p>
+        <p>
+          Turn on <strong>Sample sites</strong> to see the later data release. It contains
+          6,825 records, including 66 additional samples from Ireland. Each marker locates
+          a soil sample with a count per 100 g of dry soil. Several records can share a
+          location. The marker colours distinguish Antarctic records from other biomes.
+          A count of markers tells us where sampling occurred. Calculating the area sampled
+          would also require the footprint of each collection.
+          <a href="https://doi.org/10.1038/s41597-020-0437-3">2020 data paper</a> ·
+          <a href="https://doi.org/10.6084/m9.figshare.11733897.v1">Figshare sample records</a>
+        </p>
+
+        <h3 id="soil-channel-contract">Reading the soil layer</h3>
+        <p>
+          The veil uses the predicted number of nematodes per square metre. We read every row
+          of the published abundance and uncertainty grids, weighted the input by area and
+          mapped the result onto six 512 × 512 faces. A cell is about 20 km across on
+          average, with its size varying across a face. Zoom stops when the widest ground
+          cell at the centre of the view would occupy eight CSS pixels. Zooming closer
+          would only enlarge the same prediction.
+          <a href="https://doi.org/10.3929/ethz-b-000354035">Abundance and uncertainty grids</a> ·
+          <a href="/data/soil_plain_512_v2/cube_meta.json">Project atlas metadata</a>
+        </p>
+        <ul>
+          <li><strong>Density and coverage.</strong> One channel stores the logarithm of the
+            average abundance across the cell. Another records the fraction with a valid
+            prediction. A coastal cell’s average already accounts for partial coverage.
+            Where coverage is zero, the viewer leaves a gap. This includes the open ocean
+            and the poles beyond the source’s 88° latitude limit.</li>
+          <li><strong>Model uncertainty.</strong> The colour overlay summarizes variation
+            across the source study’s bootstrap predictions. For each source pixel, the
+            coefficient of variation is the standard deviation divided by the mean.
+            The display averages those coefficients over the supported area. Estimating
+            uncertainty in the total population of a region would require a separate calculation.</li>
+          <li><strong>Feeding groups.</strong> The data files also store the share of
+            omnivores and predators among five separately modelled feeding groups. This
+            layer uses a coarser extraction with its own coverage mask. Some cells with a
+            density prediction lack feeding-group data. The viewer currently displays density
+            and uncertainty. <a href="https://doi.org/10.3929/ethz-b-000354394">Functional-group grids</a></li>
+        </ul>
+        <p>
+          We checked how much the conversion changes the source total. Using the project’s
+          spherical cell areas, the input integrates to about 4.615 × 10²⁰, roughly 4.9%
+          above the study’s central estimate. The density integral recovered using the viewer’s texel decoding
+          differs from the input integral by 0.056%. The smaller figure measures what the conversion preserves.
+          It says nothing about a prediction’s accuracy at a particular location.
+          <a href="/data/soil_plain_512_v2/cube_meta.json">Conversion checks and area convention</a>
+        </p>
+
+        <h3>Terrain and built-up land</h3>
+        <p>
+          NOAA’s ETOPO 2022 supplies bedrock and ice-surface heights at 60 arc-seconds.
+          The viewer draws the bedrock. It uses both surfaces to estimate where ice sits on
+          land, including where the bed lies below sea level. The simplified mask can also
+          classify ice-free inland basins below sea level as water.
+          <a href="https://www.ncei.noaa.gov/products/etopo-global-relief-model">NOAA relief model and grids</a> ·
+          <a href="/data/elevation_plain_2048/cube_meta.json">Project land-mask checks</a>
+        </p>
+        <p>
+          The European Commission’s GHS-BUILT-S grid gives square metres of built-up
+          surface per cell for 2020. We divide that area by the cell’s physical area,
+          which varies with latitude, to get the fraction used by the Cobb illustration.
+          <a href="https://doi.org/10.2905/9F06F36F-4B11-47EC-ABB0-4F8B7B1D72EA">GHS-BUILT-S R2023A</a> ·
+          <a href="/data/urban_plain_2048/cube_meta.json">Project built-up atlas metadata</a>
+        </p>
+
+        <h3 id="marine-research">Why the oceans are blank</h3>
+        <p>
+          The soil survey covers land. We investigated whether published seafloor
+          measurements could support a marine layer. Two regional experiments used sediment
+          cores covering the top 5 cm. We held out one area or station at a time and asked
+          whether water depth predicted abundance better than a constant fitted to the
+          remaining cores.
+        </p>
+        <p>
+          In the Clarion–Clipperton Zone, the depth model did worse across 31 cores in four
+          areas. At HAUSGARTEN it did better across 65 cores at three stations. The first
+          study reports total nematode abundance. For the second, we summed reported taxon
+          abundances, whose completeness is uncertain. These results have too little
+          geographic coverage to justify colouring the global seafloor.
+          <a href="https://doi.org/10.1594/PANGAEA.873272">Hauquier et al., Clarion–Clipperton Zone (CC BY 3.0)</a> ·
+          <a href="https://doi.org/10.1594/PANGAEA.973147">Schnier et al., HAUSGARTEN (CC BY 4.0)</a>
+        </p>
+        <p>
+          Two other sources helped define the limits. Canyon samples record animals picked
+          for identification. The seafloor compilation by Wei and colleagues includes 230
+          nematode records with no common sediment-depth interval. We excluded both from
+          the fixed-depth comparison.
+          <a href="https://doi.org/10.1594/PANGAEA.776716">Ingels et al., canyon data (CC BY 3.0)</a> ·
+          <a href="https://doi.org/10.1371/journal.pone.0020094">Canyon sampling method</a> ·
+          <a href="https://doi.org/10.1371/journal.pone.0015323.s001">Wei et al., File S1 (CC Attribution, version unspecified in the article)</a>
+        </p>
+      </section>
+
+      <!-- ================================================================= -->
+      <section id="rendering">
+        <h2>How the globe is drawn</h2>
+
+        <h3>From soil density to a visible veil</h3>
+        <p>
+          The soil map estimates the number of nematodes beneath each square metre of ground
+          in the upper 15 cm. It tells us little about where each animal lies within that
+          column. To draw the veil, the renderer combines the mapped abundance at each location
+          with an invented vertical profile. Changing that profile changes the silhouette you
+          see from orbit. The source observations stay the same.
+          <a href="https://doi.org/10.1038/s41586-019-1418-6">Soil abundance study</a>.
+        </p>
+        <p>
+          How much light would a column of nematodes block? The exhibit assumes that a single
+          animal presents an average silhouette of 14,900 square micrometres. Multiplying
+          that area by the abundance per square metre gives the optical depth. The silhouette
+          is a display assumption. Actual body sizes, orientations and clustering vary.
+          The renderer integrates the loss of light along a line of sight using a standard
+          volume-rendering model.
+          <a href="https://courses.cs.duke.edu/cps296.8/spring03/papers/max95opticalModelsForDirectVolumeRendering.pdf">Max, <i>Optical Models for Direct Volume Rendering</i></a>.
+        </p>
+        <p>
+          Looking along the edge of the globe, you see through more of the shell than when
+          looking straight down. That longer path makes the rim bright. The opening uses an
+          exaggerated 32 km scale height and caps the optical depth to keep the rim legible.
+          The project’s <a href="/sources/optical.ts.txt">optical model</a> and
+          <a href="/sources/descent.ts.txt">height profile</a> give the settings.
+          The path-length approximation follows
+          <a href="https://doi.org/10.1088/0959-5309/43/5/302">Chapman’s treatment of light passing through a curved atmosphere</a>.
+        </p>
+
+        <h3>The shape of the globe</h3>
+        <p>
+          For each pixel the graphics processor traces a ray through a shell around the WGS 84
+          ellipsoid. It samples up to 128 positions per crossing, stopping early when less than
+          0.3% of the light remains. Solid Earth initially hides the far side. Once the rock
+          disappears, a ray can cross the hollow interior and pick up the far-side veil as well.
+          The full sweep lasts about 33.5 seconds at normal playback. Scrubbing lets you inspect
+          any stage. <a href="https://www.faa.gov/documentlibrary/media/order/8260.42b.pdf">WGS 84 ellipsoid parameters (FAA Order 8260.42B, Appendix 2)</a>.
+        </p>
+        <p>
+          The soil texture wraps six square faces around the globe. Each face has 512 cells per
+          side. The nominal spacing is about 20 km, with a larger footprint near the middle
+          of a face than at its corners. Smoothing between neighboring values helps the veil
+          look continuous. Zoom stops before those cells fill the screen with apparent detail
+          that the soil map cannot resolve. The sample overlay places a fixed-size marker at
+          each published coordinate, so a high count in one sample does not enlarge its dot.
+          <a href="/data/soil_plain_512_v2/cube_meta.json">Soil texture metadata</a> ·
+          <a href="/data/nematode_samples_v2/samples_meta.json">Sample record layout</a>.
+        </p>
+      </section>
+
+      <section id="wrong">
+        <h2>What changed in testing</h2>
+
+        <h3>Floating ice looked like land</h3>
+        <p>
+          An early ice mask drew a sharp-edged patch around Greenland. It classified thick
+          ice as ground even where the ice floated on water. The global land fraction still
+          looked plausible, so that single check missed the error. The corrected mask uses
+          bedrock and ice-surface heights to approximate where ice is grounded. The pipeline
+          now checks specific places, including the Greenland summit, Baffin Bay and the Ross
+          Ice Shelf. Coastal cells and below-sea-level basins remain approximate.
+          <a href="https://doi.org/10.25921/fd45-gt74">NOAA ETOPO relief model</a> ·
+          <a href="/data/elevation_plain_512/cube_meta.json">Land-mask checks and probe values</a>.
+        </p>
+        <h3>Empty ocean cells still glowed</h3>
+        <p>
+          To store density on a logarithmic scale, the original texture assigned a small
+          positive value even to empty cells. Drawing that value gave the ocean a faint veil.
+          A separate coverage channel now hides cells with no source data, including in the
+          uncertainty overlay. A blank ocean marks the edge of the terrestrial model’s
+          coverage. Marine nematode abundance there remains unknown.
+          <a href="#soil-channel-contract">Soil channels and coverage</a>.
+        </p>
+        <h3>Smooth gradients acquired stripes</h3>
+        <p>
+          The dimmest parts of the veil use only a few shades on an 8-bit display. Rounding
+          many neighboring pixels to the same shade produced visible bands. The shader now
+          varies brightness slightly from pixel to pixel. In the project’s test gradient,
+          the longest run of identical values fell from 28 pixels to four. The variation
+          scales with the light in the veil, leaving empty sky dark. The measurement is
+          reproducible with the <a href="/sources/veilDither.test.ts.txt">gradient test</a>.
+        </p>
+      </section>
+
+      <section id="colophon">
+        <h2>Software and delivery</h2>
+
+        <p>
+          The globe runs in the browser using TypeScript, three.js and WebGPU. A Python pipeline
+          reads the scientific rasters ahead of time and converts them into textures. That lets
+          a visitor load the exhibit without downloading the original multi-gigabyte files.
+          <a href="https://github.com/mrdoob/three.js/releases/tag/r185">three.js r185</a> ·
+          <a href="#credits">Research and data credits</a>.
+        </p>
+        <p>
+          The site sends the textures compressed with Brotli. The release build decodes each
+          file and checks that its checksum matches the one recorded before compression. Terrain and built-up land load
+          in stages, so the globe can open while finer geography is still arriving. HTML is
+          revalidated on return visits, and changed datasets get new URLs so cached textures
+          stay matched to their metadata.
+          <a href="https://www.rfc-editor.org/rfc/rfc7932">Brotli format</a> ·
+          <a href="https://developers.cloudflare.com/pages/configuration/headers/">Cloudflare Pages response headers</a>.
+        </p>
+        <p>
+          JavaScript and a usable WebGPU device power the interactive view. With either one
+          unavailable, visitors can see the still image and read the same methods and credits.
+          <a href="/viewer.html">Return to the exhibit</a>.
+        </p>
+      </section>
+
+      <!-- ================================================================= -->
+      <section id="references">
+        <h2>Research references</h2>
+        <ul>
+          <li>Nathan A. Cobb. “Nematodes and their relationships.” <em>Yearbook of the United
+            States Department of Agriculture 1914</em>, published in 1915, pp. 457–490.
+            <a href="https://archive.org/details/yoa1914/page/472/mode/2up">Read the passage on p. 472</a>.</li>
+          <li>Johan van den Hoogen and coauthors. “Soil nematode abundance and functional group
+            composition at a global scale.” <em>Nature</em> 572, 194–198 (2019).
+            <a href="https://doi.org/10.1038/s41586-019-1418-6">Paper</a> ·
+            <a href="https://nemaplex.ucdavis.edu/FerrisPublications/pdf%20files/213%20Hoogen_et_al-2019-Nature.pdf">Open manuscript (PDF)</a>.</li>
+          <li>Johan van den Hoogen and coauthors. “A global database of soil nematode abundance
+            and functional group composition.” <em>Scientific Data</em> 7, 103 (2020).
+            <a href="https://doi.org/10.1038/s41597-020-0437-3">Data paper</a> ·
+            <a href="https://doi.org/10.6084/m9.figshare.11733897.v1">Version 1 sample records</a>.</li>
+          <li>Xianping Li and coauthors. “Management effects on soil nematode abundance differ
+            among functional groups and land-use types at a global scale.”
+            <em>Journal of Animal Ecology</em> 91, 1770–1780 (2022).
+            <a href="https://doi.org/10.1111/1365-2656.13744">Land-use comparison</a>.</li>
+        </ul>
+      </section>
+
+      <section id="credits" aria-labelledby="credits-title">
+        <h2 id="credits-title">Credits &amp; rights</h2>
+        <p>Ethan Soch created the viewer, data pipeline, and visual interpretation, with coding
+          assistance from Claude Code and Codex. The original software is MIT-licensed.
+          The data, quotations, and images have their own terms.
+          <a href="/sources/CITATION.cff" download>Cite the software (CITATION.cff)</a>.</p>
+        <ul>
+          <li><strong>Historical text.</strong> The opening quotes Nathan A. Cobb’s
+            <a href="https://archive.org/details/yoa1914/page/472/mode/2up">USDA Yearbook essay, p. 472</a>.</li>
+          <li><strong>Soil model and images.</strong> Johan van den Hoogen and coauthors published
+            the <a href="https://doi.org/10.1038/s41586-019-1418-6">abundance model</a>. Van den Hoogen
+            and Devin Routh deposited the <a href="https://doi.org/10.3929/ethz-b-000354035">abundance
+            and uncertainty rasters</a> and the <a href="https://doi.org/10.3929/ethz-b-000354394">feeding-group
+            rasters</a> at ETH Zurich. Both records permit non-commercial use. The soil textures
+            and poster images derive from these rasters. For other uses outside applicable
+            exceptions, seek permission from the rights holders.
+            <a href="https://rightsstatements.org/page/InC-NC/1.0/">ETH source rights statement</a>.</li>
+          <li><strong>Sample locations.</strong> Stefan Geisen, Johan van den Hoogen, Data Providers,
+            and Thomas Crowther released the <a href="https://doi.org/10.6084/m9.figshare.11733897">sample dataset</a>
+            under CC0. The <a href="https://doi.org/10.1038/s41597-020-0437-3">2020 data paper</a>
+            describes the collection and its sampling methods.</li>
+          <li><strong>Terrain.</strong> NOAA’s National Centers for Environmental Information released
+            <a href="https://doi.org/10.25921/fd45-gt74">ETOPO 2022</a> under CC0. We resampled its
+            60 arc-second bedrock and ice-surface grids to draw terrain and estimate land cover.</li>
+          <li><strong>Built-up surface.</strong> Martino Pesaresi and Panagiotis Politis at the
+            European Commission Joint Research Centre produced
+            <a href="https://doi.org/10.2905/9F06F36F-4B11-47EC-ABB0-4F8B7B1D72EA">GHS-BUILT-S R2023A</a>.
+            We converted the 2020 built-up area to fractions of each cell and resampled the result.
+            The <a href="https://data.jrc.ec.europa.eu/dataset/9f06f36f-4b11-47ec-abb0-4f8b7b1d72ea">catalogue</a>
+            specifies the European Commission reuse notice.</li>
+          <li><strong>Marine research.</strong> The offline experiment draws on four separately
+            credited deposits. <a href="#marine-research">Marine data and reuse terms</a>.</li>
+        </ul>
+        <details>
+          <summary>Project software copyright and MIT licence</summary>
+          <pre id="project-license">MIT License
+
+Copyright (c) 2026 Ethan Soch
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.</pre>
+        </details>
+        <details>
+          <summary>three.js copyright and MIT licence</summary>
+          <pre id="three-license">The MIT License
+
+Copyright © 2010-2026 three.js authors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in
+all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+THE SOFTWARE.</pre>
+        </details>
+        <details>
+          <summary>Vite browser helper copyright and MIT licence</summary>
+          <pre id="vite-license">MIT License
+
+Copyright (c) 2019-present, VoidZero Inc. and Vite contributors
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.</pre>
+        </details>
+        <details>
+          <summary>ACES filmic fit copyright and upstream notice</summary>
+          <p>Stephen Hill's colour transform appears in three.js and in the project's CPU
+          reference. The <a href="https://github.com/selfshadow/ltc_code/blob/31e5e96b54f98f33098f8503003119ba2231a1c6/webgl/shaders/ltc/ltc_blit.fs">upstream shader</a>
+          accompanies <a href="https://doi.org/10.1145/2897824.2925895">the 2016 paper by
+          Heitz, Dupuy, Hill and Neubelt</a>.</p>
+          <pre id="ltc-license">Copyright (c) 2017, Eric Heitz, Jonathan Dupuy, Stephen Hill and David Neubelt.
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+* If you use (or adapt) the source code in your own work, please include a
+  reference to the paper:
+
+  Real-Time Polygonal-Light Shading with Linearly Transformed Cosines.
+  Eric Heitz, Jonathan Dupuy, Stephen Hill and David Neubelt.
+  ACM Transactions on Graphics (Proceedings of ACM SIGGRAPH 2016) 35(4), 2016.
+  Project page: https://eheitzresearch.wordpress.com/415-2/
+
+* Redistributions of source code must retain the above copyright notice, this
+  list of conditions and the following disclaimer.
+
+* Redistributions in binary form must reproduce the above copyright notice,
+  this list of conditions and the following disclaimer in the documentation
+  and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.</pre>
+        </details>
+      </section>
+    </main>
+    <footer>
+      <div class="wrap">
+        <a class="backlink" href="/viewer.html">&larr; Back to the globe</a>
+      </div>
+    </footer>
+  </body>
+</html>

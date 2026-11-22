@@ -1,0 +1,571 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Nematode Earth</title>
+    <meta name="description" content="Watch air, water and rock fade to reveal a map of soil nematodes, inspired by Nathan Cobb’s 1914 thought experiment." />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Nematode Earth" />
+    <meta property="og:description" content="What would Earth look like if only nematodes remained? Explore a globe shaped by published estimates of soil nematode abundance." />
+    <!-- Canonical URL, preview image and favicon are injected by the build. -->
+    <!-- Unhandled promise rejections, made diagnosable.
+         Chrome reports these as "Uncaught (in promise) undefined" when the
+         reason is empty, which says nothing about where they came from — the
+         exact class of instrument this project keeps getting hurt by, since
+         it reads identically whether the system is healthy or broken. This
+         re-reports each one with its type, message and stack, and keeps them
+         on window.__rejections for a harness to assert against.
+
+         It must load BEFORE the module script: every candidate fires during
+         module init, and a listener installed later sees none of them. That
+         is not hypothetical — a 36-rejection report was investigated with a
+         post-load listener that necessarily caught zero.
+
+         Note what this CANNOT see: rejections raised inside a browser
+         extension's content script run in an isolated world and never reach
+         a page-context listener, though Chrome still prints them to the
+         console attributed to this page's URL. A console rejection that does
+         not appear in window.__rejections is, by that fact, not the page's. -->
+    <script>
+      window.__rejections = [];
+      window.addEventListener('unhandledrejection', function (e) {
+        var r = e.reason;
+        var rec = {
+          tMs: Math.round(performance.now()),
+          type: typeof r,
+          name: (r && r.name) || null,
+          message: (r && r.message) || null,
+          stack: (r && r.stack) ? String(r.stack) : null,
+          str: (function () { try { return String(r); } catch (_) { return '<unstringifiable>'; } })()
+        };
+        window.__rejections.push(rec);
+        console.error('[unhandled rejection]', rec);
+      });
+    </script>
+    <!-- The WebGPU gate, and the only reason the no-WebGPU fallback at the
+         bottom of this file is reachable at all.
+
+         It stamps `data-webgpu` on <html> before the body is parsed, and the
+         stylesheet below keys the fallback and the canvas chrome off it. That
+         is deliberately NOT done from src/viewer.ts: that module is an ES
+         module containing top-level `await`, and a browser old enough to lack
+         WebGPU is exactly the browser that may fail to parse or run it. A
+         fallback assembled by the script that cannot run is not a fallback.
+
+         Classic script, ES5 only, no module syntax -- and the CSS hides the
+         fallback on an explicit "yes" rather than showing it on "no", so a
+         visitor with scripting off gets the prose instead of a black page.
+         `viewer.ts` writes "no" here too if `navigator.gpu` is present but no
+         adapter or device can actually be obtained. -->
+    <script>
+      (function () {
+        var ok = typeof navigator !== 'undefined' && navigator.gpu != null;
+        document.documentElement.setAttribute('data-webgpu', ok ? 'yes' : 'no');
+      })();
+    </script>
+    <style>
+      html, body { margin: 0; min-height: 100%; background: #04060a; }
+      /* Scoped, not global. A full-bleed canvas must not scroll; the
+         no-WebGPU fallback at the bottom of this file is a page of prose and
+         must, or its link to the methods page is clipped off the bottom of a
+         phone. `data-webgpu` is stamped by the gate script above before the
+         body is parsed, so the right rule applies from the first paint. */
+      html[data-webgpu="yes"], html[data-webgpu="yes"] body { height: 100%; overflow: hidden; }
+      canvas {
+        display: block; width: 100%; height: 100%;
+        /* Touch descent depends on this line. The canvas tracks pointers
+           itself (see core/pointerGesture.ts), but a browser that has not
+           been told otherwise claims two-finger gestures for its own page
+           zoom: it delivers `pointercancel` part-way through and the pinch
+           dies mid-descent, intermittently and per-device. The handlers still
+           run, so nothing about the failure looks broken.
+
+           Scoped to the canvas rather than taken globally with
+           `user-scalable=no` on the viewport meta, which would also stop a
+           visitor magnifying the HUD text -- a real accessibility cost for a
+           problem that is only the canvas's. */
+        touch-action: none;
+      }
+
+      /* --- palette -------------------------------------------------------
+         Five tiers, each an explicit colour rather than an opacity on a
+         shared one. The previous HUD expressed its dimmest tier as
+         `opacity: 0.65` over #7d8f9c, which composites to rgb(83,95,105) —
+         3.10:1 against the page background, below WCAG AA's 4.5:1 even
+         BEFORE anything is drawn behind it. An opacity is also unmeasurable
+         in isolation: its effective colour depends on whatever it happens to
+         be sitting over, so it cannot be checked. These can.
+
+         Measured against the worst possible backdrop, a fully white pixel,
+         through the 0.86 scrim below (see --hud-scrim):
+           --hud-key    12.63:1     --hud-quote  11.80:1
+           --hud-accent  8.59:1     --hud-body    8.16:1
+           --hud-dim     5.63:1
+         and against the page background alone, 7.83:1 at the dimmest. Every
+         tier clears AA at both ends of that range with margin. */
+      :root {
+        --hud-key:    #e6f0f7;  /* live values */
+        --hud-quote:  #dce9f2;  /* Cobb's line */
+        --hud-body:   #b4c4d0;  /* prose */
+        --hud-dim:    #93a3b0;  /* captions, statistics, key hints */
+        --hud-accent: #f2bd80;  /* prediction, never measurement */
+        --hud-ground: 4, 6, 10; /* the page background, as scrim components */
+        /* 0.86 is not decoration. The dimmest tier needs alpha >= 0.797 to
+           hold 4.5:1 against a white backdrop; 0.86 leaves headroom for the
+           gradient's own dithering without washing out more of the frame
+           than it has to. */
+        --hud-scrim: 0.86;
+      }
+
+      /* --- scrim ---------------------------------------------------------
+         The text crosses empty space AND the lit limb of the globe, so no
+         single colour can work everywhere: over black the old values read
+         6.07:1, and over the bright limb the same pixels fall to 1.2-3.3:1.
+         A backdrop-filter was rejected — blurring a bright limb yields a
+         bright blur, so it guarantees nothing, and it costs a full-screen
+         filter pass on top of a WebGPU raymarch every frame. A flat panel
+         was rejected for reading as a debug overlay in a full-bleed piece.
+
+         A gradient scrim instead: opaque enough to carry the contrast on its
+         own beneath the text, fading to nothing above it, so it never
+         resolves as a box. text-shadow below is belt-and-braces only — the
+         WCAG figures quoted above are the scrim's alone, since a shadow's
+         contribution is not something the contrast formula can credit. */
+      #topbar::before {
+        /* Wider than the text box on both sides, so the scrim reaches the
+           viewport edge rather than stopping exactly where the glyphs start. */
+        content: ''; position: absolute; left: -1.25rem; right: -1.25rem;
+        pointer-events: none; z-index: -1;
+      }
+      /* The bottom scrim is a SIBLING, not a pseudo-element on #hud. #hud has
+         to clip its own overflow (see its max-height below) and a pseudo-
+         element that deliberately extends 5rem past the box cannot survive
+         that clip. A sibling also drops the negative-z-index-plus-isolation
+         arrangement the top rail still uses: two positioned elements at
+         z-index 0 and 1 both paint above the non-positioned canvas by the
+         normal painting order, with no stacking-context trick to get wrong.
+         Height tracks the HUD's real measured height (--hud-height, set from
+         a ResizeObserver in viewer.ts) plus headroom for the fade. */
+      #hud-scrim {
+        /* Shaped like the TEXT, not like the viewport, and smooth in both
+           axes.
+
+           The first version was `left:0; right:0` at full strength across the
+           whole frame while the text it protects is a left-aligned column
+           occupying about a third of the width — so most of its area dimmed
+           nothing but planet. Its ramp also went linear-to-0.86 then flat,
+           and a slope discontinuity is what the eye locates: it read as hard
+           horizontal stripes over the globe rather than as a scrim.
+
+           Now: a smoothstep falloff (C1-continuous, no slope break to see)
+           over a long distance, falling off HORIZONTALLY as well via a mask
+           whose plateau tracks the measured right edge of the real text
+           (--hud-text-width, from the same ResizeObserver as --hud-height),
+           so it dissolves before reaching the middle of the frame.
+
+           STOP POSITIONS MUST BE NON-DECREASING. A single out-of-order stop
+           makes CSS clamp it to its predecessor, collapsing every stop after
+           it onto one position and turning the tail of the ramp into a hard
+           step — which is exactly the visible edge this block once shipped.
+           test/hudScrim.test.ts parses these gradients and fails on it.
+
+           Alpha is driven solely by --hud-scrim, so forcing that to 0 removes
+           the scrim entirely, which is what makes the differential check able
+           to fail. */
+        position: fixed; inset: 0; z-index: 0;
+        pointer-events: none;
+        background: linear-gradient(to top,
+          rgba(var(--hud-ground), var(--hud-scrim)) 0,
+          rgba(var(--hud-ground), var(--hud-scrim)) calc(var(--hud-height, 16rem) + 1.5rem + 0.0rem),
+          rgba(var(--hud-ground), calc(var(--hud-scrim) * 0.957)) calc(var(--hud-height, 16rem) + 1.5rem + 2.0rem),
+          rgba(var(--hud-ground), calc(var(--hud-scrim) * 0.8438)) calc(var(--hud-height, 16rem) + 1.5rem + 4.0rem),
+          rgba(var(--hud-ground), calc(var(--hud-scrim) * 0.6836)) calc(var(--hud-height, 16rem) + 1.5rem + 6.0rem),
+          rgba(var(--hud-ground), calc(var(--hud-scrim) * 0.5)) calc(var(--hud-height, 16rem) + 1.5rem + 8.0rem),
+          rgba(var(--hud-ground), calc(var(--hud-scrim) * 0.3164)) calc(var(--hud-height, 16rem) + 1.5rem + 10.0rem),
+          rgba(var(--hud-ground), calc(var(--hud-scrim) * 0.1562)) calc(var(--hud-height, 16rem) + 1.5rem + 12.0rem),
+          rgba(var(--hud-ground), calc(var(--hud-scrim) * 0.043)) calc(var(--hud-height, 16rem) + 1.5rem + 14.0rem),
+          rgba(var(--hud-ground), 0) calc(var(--hud-height, 16rem) + 1.5rem + 16.0rem));
+        -webkit-mask-image: linear-gradient(to right,
+          rgba(0, 0, 0, 1) 0,
+          rgba(0, 0, 0, 1.0) calc(var(--hud-text-width, 40rem) + 2rem + 0.0rem),
+          rgba(0, 0, 0, 0.957) calc(var(--hud-text-width, 40rem) + 2rem + 4.75rem),
+          rgba(0, 0, 0, 0.8438) calc(var(--hud-text-width, 40rem) + 2rem + 9.5rem),
+          rgba(0, 0, 0, 0.6836) calc(var(--hud-text-width, 40rem) + 2rem + 14.25rem),
+          rgba(0, 0, 0, 0.5) calc(var(--hud-text-width, 40rem) + 2rem + 19.0rem),
+          rgba(0, 0, 0, 0.3164) calc(var(--hud-text-width, 40rem) + 2rem + 23.75rem),
+          rgba(0, 0, 0, 0.1562) calc(var(--hud-text-width, 40rem) + 2rem + 28.5rem),
+          rgba(0, 0, 0, 0.043) calc(var(--hud-text-width, 40rem) + 2rem + 33.25rem),
+          rgba(0, 0, 0, 0.0) calc(var(--hud-text-width, 40rem) + 2rem + 38.0rem));
+        mask-image: linear-gradient(to right,
+          rgba(0, 0, 0, 1) 0,
+          rgba(0, 0, 0, 1.0) calc(var(--hud-text-width, 40rem) + 2rem + 0.0rem),
+          rgba(0, 0, 0, 0.957) calc(var(--hud-text-width, 40rem) + 2rem + 4.75rem),
+          rgba(0, 0, 0, 0.8438) calc(var(--hud-text-width, 40rem) + 2rem + 9.5rem),
+          rgba(0, 0, 0, 0.6836) calc(var(--hud-text-width, 40rem) + 2rem + 14.25rem),
+          rgba(0, 0, 0, 0.5) calc(var(--hud-text-width, 40rem) + 2rem + 19.0rem),
+          rgba(0, 0, 0, 0.3164) calc(var(--hud-text-width, 40rem) + 2rem + 23.75rem),
+          rgba(0, 0, 0, 0.1562) calc(var(--hud-text-width, 40rem) + 2rem + 28.5rem),
+          rgba(0, 0, 0, 0.043) calc(var(--hud-text-width, 40rem) + 2rem + 33.25rem),
+          rgba(0, 0, 0, 0.0) calc(var(--hud-text-width, 40rem) + 2rem + 38.0rem));
+      }
+      #topbar::before {
+        /* Full width is justified here — the sliders genuinely span the frame
+           — but the fade had the same linear-then-flat slope break as the
+           bottom scrim, and landed as a visible horizontal edge across the
+           globe. Same smoothstep ramp, over 9rem instead of 4. */
+        top: -1.5rem; bottom: -9rem;
+        background: linear-gradient(to bottom,
+          rgba(var(--hud-ground), var(--hud-scrim)) 0,
+          rgba(var(--hud-ground), var(--hud-scrim)) calc(100% - 9.0rem),
+          rgba(var(--hud-ground), calc(var(--hud-scrim) * 0.957)) calc(100% - 7.875rem),
+          rgba(var(--hud-ground), calc(var(--hud-scrim) * 0.8438)) calc(100% - 6.75rem),
+          rgba(var(--hud-ground), calc(var(--hud-scrim) * 0.6836)) calc(100% - 5.625rem),
+          rgba(var(--hud-ground), calc(var(--hud-scrim) * 0.5)) calc(100% - 4.5rem),
+          rgba(var(--hud-ground), calc(var(--hud-scrim) * 0.3164)) calc(100% - 3.375rem),
+          rgba(var(--hud-ground), calc(var(--hud-scrim) * 0.1562)) calc(100% - 2.25rem),
+          rgba(var(--hud-ground), calc(var(--hud-scrim) * 0.043)) calc(100% - 1.125rem),
+          rgba(var(--hud-ground), 0) calc(100% - 0.0rem));
+      }
+
+      #hud, #topbar {
+        /* left+right (not left+width/shrink-to-fit) so the box's width is
+           always exactly viewport - 2.5rem: it can never extend past either
+           edge at any window size. */
+        position: fixed; left: 1.25rem; right: 1.25rem;
+        font: 12.5px/1.6 ui-monospace, SFMono-Regular, Menlo, monospace;
+        color: var(--hud-body);
+        box-sizing: border-box; overflow-wrap: break-word;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85);
+      }
+      /* #topbar keeps the pseudo-element scrim, so it needs the stacking
+         context that keeps `z-index: -1` out of the ROOT context's negative
+         layer — where it would paint beneath the canvas and be invisible. */
+      #topbar { isolation: isolate; }
+      #hud {
+        bottom: 1.25rem; pointer-events: none; z-index: 1;
+        /* Bottom-anchored and clipped at the TOP. At short viewports this
+           block grew taller than the space above the control rail and drew
+           straight through it — measured at 64px of overlap in a 336px-tall
+           viewport. Shrinking alone cannot fix every case, so: shrink first
+           (the max-height media query below), then clip, and never overlap.
+           The clip falls at the BOTTOM, by the same ranking the rest of this
+           pass is built on: the quotation is the emotional core and the count
+           is the hook, so they are the last things to go, and the key hints —
+           explicitly the utility tier — are the first. */
+        display: flex; flex-direction: column; justify-content: flex-start;
+        max-height: calc(100dvh - var(--topbar-height, 7rem) - 2.5rem);
+        overflow: hidden;
+      }
+      #topbar { top: 1.25rem; display: flex; flex-direction: column; gap: 0.5rem; }
+
+      /* Only while the clip is actually cutting something off: a hard slice
+         through the middle of a glyph reads as a rendering fault, which is
+         the same "looks broken" failure this pass exists to remove. Applied
+         by class, not unconditionally, so the top line is not dimmed in the
+         normal case where nothing is being clipped at all. */
+      #hud.is-clipped {
+        -webkit-mask-image: linear-gradient(to top, transparent 0, #000 2rem);
+        mask-image: linear-gradient(to top, transparent 0, #000 2rem);
+      }
+
+      #hud b, #topbar b { color: var(--hud-key); font-weight: 500; }
+      /* The quotation is its own tier; it must not be recoloured to the
+         value tier just because it is typed into a <b>. */
+      .hud-quote b { color: inherit; font-weight: 400; }
+
+      /* --- type hierarchy -------------------------------------------------
+         Ranked deliberately: the quotation is the emotional core, the count
+         is the hook, the readouts are instruments, the key hints are
+         utility. Previously the quotation, the altitude readout and the
+         eight-binding key line were all 12px and separated only by the
+         presence of a <b>, so the ranking existed in the spec and nowhere on
+         screen. Size, weight, colour and spacing now all agree. */
+      .hud-wordmark {
+        font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase;
+        color: var(--hud-dim); margin-bottom: 0.5rem;
+      }
+      .hud-quote {
+        font-size: 15px; line-height: 1.55; color: var(--hud-quote);
+        /* A chosen measure. Below ~1240px every line in the old HUD wrapped
+           at the viewport edge, so the layout changed shape with the window;
+           capping the prose tiers at a readable measure means they wrap at
+           the same place on a 1400px screen and a 1000px one, and the
+           viewport only starts to matter once it is narrower than this. */
+        max-width: 58ch;
+      }
+      .hud-attrib {
+        font-size: 11px; color: var(--hud-dim); margin-top: 0.15rem;
+      }
+      .hud-count { margin: 0.85rem 0 0.75rem; }
+      .hud-count-label {
+        display: block; font-size: 10.5px; letter-spacing: 0.12em;
+        text-transform: uppercase; color: var(--hud-dim);
+      }
+      .hud-count-value {
+        font-size: 22px; line-height: 1.15; color: var(--hud-key); font-weight: 500;
+      }
+      .hud-count-compare {
+        display: block; font-size: 12px; color: var(--hud-body); margin-top: 0.1rem;
+      }
+      .hud-readouts { color: var(--hud-body); }
+      .hud-finding { margin-top: 0.75rem; max-width: 62ch; }
+      .hud-finding-lede { color: var(--hud-body); }
+      .hud-finding-result { color: var(--hud-key); font-weight: 500; }
+      .hud-finding-stats {
+        font-size: 11px; line-height: 1.5; color: var(--hud-dim); margin-top: 0.15rem;
+      }
+      /* Carries the about link, which sits under the finding rather than in
+         the hint tail -- see viewer.ts for why. A wrapper row, because a
+         margin on the inline anchor itself would do nothing vertically. */
+      .hud-finding-link { margin-top: 0.5rem; font-size: 11px; }
+      .hud-dim { color: var(--hud-dim); }
+      .hud-accent { color: var(--hud-accent); font-style: italic; }
+      .hud-hints {
+        margin-top: 0.85rem; font-size: 11px; color: var(--hud-dim);
+        letter-spacing: 0.02em;
+      }
+      /* #hud is pointer-events:none so drags reach the canvas underneath.
+         The single interactive thing in it has to opt back in, or the link
+         renders and cannot be clicked -- which looks identical to working. */
+      .hud-about {
+        pointer-events: auto; color: var(--hud-key);
+        text-decoration: underline; text-decoration-color: var(--hud-dim);
+        text-underline-offset: 0.2em;
+      }
+      .hud-about:hover, .hud-about:focus-visible { color: #fff; }
+      /* The key panel behind `?`. Grouped, one binding per row — the shape
+         the old single run-on line could not have. */
+      .hud-keys { margin-top: 0.75rem; font-size: 11px; column-gap: 2.5rem; }
+      .hud-keys-group { break-inside: avoid; margin-bottom: 0.6rem; }
+      .hud-keys-title {
+        color: var(--hud-dim); letter-spacing: 0.1em; text-transform: uppercase;
+        font-size: 10px; margin-bottom: 0.15rem;
+      }
+      .hud-keys-row { color: var(--hud-body); }
+      .hud-keys-row kbd {
+        font: inherit; color: var(--hud-key);
+        border: 1px solid rgba(230, 240, 247, 0.28); border-radius: 3px;
+        padding: 0 0.35em; margin-right: 0.5em;
+        display: inline-block; min-width: 1.1em; text-align: center;
+      }
+
+      /* --- top rail ------------------------------------------------------
+         The two control rows were separately-positioned fixed elements at
+         top:1.25rem and top:3.25rem, which meant their spacing was a pair of
+         magic numbers that could not survive either row wrapping. One flex
+         column instead, so a wrapped row pushes the next one down. */
+      /* Only the controls themselves take pointer events. #hud is
+         pointer-events:none for exactly this reason — it must never steal the
+         canvas's drag/wheel handlers — but the top rail was two opaque
+         full-width rows that did steal them, and it is taller now that it
+         carries a caption. Everything here is transparent to the pointer
+         except the button and slider hit areas. */
+      #topbar, .rail-row, .rail-caption, .rail-label { pointer-events: none; }
+      .rail-row button, .rail-row input { pointer-events: auto; }
+
+      .rail-row { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; }
+      .rail-row input[type="range"] { flex: 1; min-width: 8rem; }
+      .rail-label { font-size: 11.5px; color: var(--hud-body); white-space: nowrap; }
+      .rail-caption {
+        font-size: 11px; color: var(--hud-dim); max-width: 78ch; line-height: 1.5;
+      }
+      .rail-row button {
+        font: inherit; color: var(--hud-body); background: #12161d;
+        border: 1px solid #39434f; border-radius: 3px;
+        padding: 0.2rem 0.6rem; cursor: pointer;
+      }
+      .rail-row button:hover { color: var(--hud-key); border-color: #55616f; }
+      /* A disabled control must look disabled AND say why — see the caption
+         swapped in beside it. Previously the Cobb slider stayed fully live
+         while being a complete no-op on the synthetic field. */
+      .rail-row.is-disabled { opacity: 0.55; }
+      .rail-row.is-disabled input, .rail-row.is-disabled button { cursor: not-allowed; }
+
+      @media (max-width: 900px) {
+        #hud, #topbar { font-size: 11.5px; }
+        .hud-quote { font-size: 13.5px; }
+        .hud-count-value { font-size: 19px; }
+        .hud-keys { columns: 1; }
+      }
+      @media (min-width: 901px) { .hud-keys { columns: 2; } }
+
+      /* Recover vertical space before the clip has to. Nothing is removed —
+         only the decorative wordmark, which is duplicated in the tab title. */
+      /* --- touch targets --------------------------------------------------
+         Everything in this block is inside `@media (pointer: coarse)`: a
+         mouse keeps the compact rail the HUD's measured layout was built
+         around, and only a finger gets the larger one.
+
+         WCAG 2.2 SC 2.5.8 Target Size Minimum sets 24x24 CSS px as the floor.
+         44 px is the figure Apple's and Google's touch guidance both use, and
+         these are the piece's primary controls -- the sweep scrubber, the
+         Cobb axis, Play and Replay -- so they get 44. Before this they were a
+         28 px button and a range input with about 16 px of hit box, both of
+         which draw perfectly at any size. */
+      @media (pointer: coarse) {
+        .rail-row { gap: 0.6rem 0.9rem; }
+        .rail-row button { min-height: 44px; padding: 0.55rem 1rem; }
+
+        /* A 44 px-tall NATIVE range is a 44 px box with a small thumb in the
+           middle of it, and on iOS a tap on the track does not move the thumb
+           -- the thumb itself has to be grabbed, so the box height buys
+           nothing there. The control is rebuilt instead: appearance stripped,
+           an explicit track, and a thumb sized to a fingertip. Both vendor
+           pseudo-elements are required; neither half has an unprefixed form
+           in any shipping browser. */
+        .rail-row input[type="range"] {
+          height: 44px; margin: 0; background: transparent;
+          -webkit-appearance: none; appearance: none;
+        }
+        .rail-row input[type="range"]::-webkit-slider-runnable-track {
+          height: 4px; border-radius: 2px; background: #39434f;
+        }
+        .rail-row input[type="range"]::-moz-range-track {
+          height: 4px; border-radius: 2px; background: #39434f;
+        }
+        .rail-row input[type="range"]::-webkit-slider-thumb {
+          -webkit-appearance: none; appearance: none;
+          width: 28px; height: 28px; border-radius: 50%;
+          background: var(--hud-key); border: 1px solid #12161d;
+          /* Centres a 28 px thumb on a 4 px track: -(28 - 4) / 2. */
+          margin-top: -12px;
+        }
+        .rail-row input[type="range"]::-moz-range-thumb {
+          width: 28px; height: 28px; border-radius: 50%;
+          background: var(--hud-key); border: 1px solid #12161d;
+        }
+        .rail-row input[type="range"]:focus-visible { outline: 2px solid var(--hud-key); }
+
+        /* The only link in the HUD. Padding does not grow the hit box of an
+           INLINE box, so it becomes inline-block first -- the same class of
+           "renders and cannot be used" defect as the `pointer-events: auto`
+           above, which is why both live next to each other in the tests. */
+        .hud-about { display: inline-block; min-height: 44px; padding: 0.7rem 0; }
+      }
+
+      /* --- the page for a visitor without WebGPU ---------------------------
+         Static markup at the bottom of <body>, shown by CSS, never built by
+         the module -- see the gate script in <head> for why. The whole of
+         this page used to be one sentence assigned over #hud with
+         `textContent =`, which deletes every other element including the link
+         to the methods page, a 10,800-word document that needs no GPU at all.
+
+         Hidden on an explicit "yes" rather than shown on "no", so the state
+         with no attribute at all -- scripting off, gate script failed -- is
+         the one that shows the prose. */
+      #no-webgpu { display: block; }
+      html[data-webgpu="yes"] #no-webgpu { display: none; }
+      html:not([data-webgpu="yes"]) #hud,
+      html:not([data-webgpu="yes"]) #hud-scrim,
+      html:not([data-webgpu="yes"]) #topbar,
+      html:not([data-webgpu="yes"]) canvas { display: none; }
+
+      #no-webgpu {
+        box-sizing: border-box;
+        /* The same measure, gutter and prose face as about.html, which is
+           where this page is trying to send the reader. The two are one work
+           and should not read as two. */
+        max-width: 68ch; margin: 0 auto; padding: 2.5rem 1.25rem 4rem;
+        font: 14.5px/1.8 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        color: var(--hud-body); overflow-wrap: break-word;
+      }
+      #no-webgpu p { margin: 0 0 1.1rem; }
+      .nw-wordmark {
+        font-size: 10.5px; letter-spacing: 0.14em; text-transform: uppercase;
+        color: var(--hud-dim); margin: 0 0 1.5rem;
+      }
+      .nw-quote { margin: 0 0 1.75rem; }
+      .nw-quote p {
+        font-size: 19px; line-height: 1.5; color: var(--hud-quote); margin: 0;
+      }
+      .nw-attrib {
+        display: block; font-size: 12px; font-style: normal;
+        color: var(--hud-dim); margin-top: 0.5rem;
+      }
+      .nw-figure { margin: 0 0 1.75rem; }
+      /* width/height are on the <img> as well, so the aspect ratio is known
+         before the bytes arrive and the prose below does not jump. */
+      .nw-figure img {
+        display: block; width: 100%; height: auto;
+        border: 1px solid #1b222c; border-radius: 2px; background: #04060a;
+      }
+      .nw-caption {
+        font-size: 12px; line-height: 1.6; color: var(--hud-dim); margin-top: 0.6rem;
+      }
+      .nw-heading {
+        font: inherit; font-size: 21px; line-height: 1.35; font-weight: 500;
+        color: var(--hud-key); margin: 0 0 1.1rem;
+      }
+      #no-webgpu a { color: var(--hud-key); }
+      .nw-ext { border-bottom: 1px solid var(--hud-dim); text-decoration: none; }
+      .nw-about-lead { margin-top: 2rem; }
+      /* The route out. Deliberately the largest target on the page: it is the
+         only thing this visitor CAN do, and the piece's central finding is on
+         the other side of it. */
+      .nw-about {
+        display: inline-flex; align-items: center; justify-content: center;
+        min-height: 48px; padding: 0.75rem 1.4rem;
+        border: 1px solid #55616f; border-radius: 3px;
+        color: var(--hud-key); text-decoration: none; font-size: 15px;
+      }
+      .nw-about:hover, .nw-about:focus-visible { border-color: var(--hud-key); color: #fff; }
+
+      @media (max-width: 640px) {
+        #no-webgpu { padding: 1.75rem 1rem 3rem; }
+        .nw-quote p { font-size: 16.5px; }
+        .nw-heading { font-size: 18px; }
+      }
+
+      @media (max-height: 780px) {
+        #hud { font-size: 11.5px; line-height: 1.5; }
+        .hud-wordmark { display: none; }
+        .hud-quote { font-size: 13px; line-height: 1.45; max-width: 54ch; }
+        .hud-count { margin: 0.5rem 0 0.4rem; }
+        .hud-count-value { font-size: 18px; }
+        .hud-finding { margin-top: 0.45rem; }
+        .hud-finding-stats { font-size: 10.5px; line-height: 1.4; }
+        .hud-hints { margin-top: 0.5rem; }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="hud-scrim"></div>
+    <div id="hud"></div>
+    <!-- The page a visitor without WebGPU is given. Revealed by the CSS above
+         when <html> is not stamped data-webgpu="yes"; see the gate script in
+         <head>. Every sentence here is also in src/hud/copy.ts, and
+         test/noWebGPUFallback.test.ts asserts the two agree, so an edit to
+         one that is not carried to the other fails rather than drifting. -->
+    <main id="no-webgpu">
+      <p class="nw-wordmark">Nematode Earth</p>
+      <blockquote class="nw-quote">
+        <p>if all the matter in the universe except the nematodes were swept away, our world would still be dimly recognizable</p>
+        <cite class="nw-attrib"><a class="nw-ext" href="https://archive.org/details/yoa1914/page/472/mode/2up">Nathan A. Cobb, 1914, p. 472</a></cite>
+      </blockquote>
+      <figure class="nw-figure">
+        <picture>
+          <source srcset="/poster_veil_11500km_v1.avif" type="image/avif" />
+          <img
+            src="/poster_veil_11500km_v1.jpg"
+            width="1200"
+            height="800"
+            decoding="async"
+            alt="Africa and South America appear as pale shapes on a dark globe with a thin, bright rim."
+          />
+        </picture>
+        <figcaption class="nw-caption">The soil model seen from 11,500 km. The rendering exaggerates the veil’s thickness and brightness so its shape is visible.</figcaption>
+      </figure>
+      <h1 class="nw-heading">The soil model in one frame</h1>
+      <p id="no-webgpu-reason">The interactive globe needs JavaScript and a device that supports WebGPU.</p>
+      <p>Air, water and rock fade over about 34 seconds. The veil that remains shows where the 2019 soil model predicts more nematodes. In the interactive view, you can compare it with published sample locations.</p>
+      <p>
+        To try the interactive view, enable JavaScript and check
+        <a class="nw-ext" href="https://caniuse.com/webgpu" target="_blank" rel="noopener noreferrer">WebGPU browser support</a>.
+      </p>
+      <p class="nw-about-lead">The methods explain how the soil map was made and what the comparison with built-up land showed across 20 cities.</p>
+      <a class="nw-about" href="/about.html">Read the science and methods</a>
+    </main>
+    <script type="module" src="/src/viewer.ts"></script>
+  </body>
+</html>

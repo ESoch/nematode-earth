@@ -1,0 +1,31 @@
+{
+  "name": "nematode-earth-app",
+  "private": true,
+  "license": "MIT",
+  "packageManager": "pnpm@10.30.3",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
+    "build": "pnpm build:uncompressed && node scripts/precompress-data.mjs && node scripts/verify-release.mjs",
+    "build:uncompressed": "pnpm clean && tsc --noEmit && vite build",
+    "test": "vitest run",
+    "test:release": "node --test scripts/test/*.test.mjs",
+    "check:release": "pnpm test && pnpm test:release && tsc --noEmit && node scripts/verify-release.mjs",
+    "preview": "node scripts/preview.mjs",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "three": "0.185.1"
+  },
+  "devDependencies": {
+    "@types/three": "^0.185.4",
+    "@webgpu/types": "^0.1.71",
+    "typescript": "^5.6.0",
+    "vite": "^6.4.6",
+    "vitest": "^4.1.12"
+  }
+}

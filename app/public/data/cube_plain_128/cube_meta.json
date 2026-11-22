@@ -1,0 +1,158 @@
+{
+  "projection": "plain",
+  "projection_description": "plain gnomonic: raw linear NDC (u,v) fed directly into the standard cube face embedding, matching app/src/field/bakeCube.ts's EXISTING (already-shipped) bake exactly",
+  "format": "RGBA16Float (uint16 little-endian bit patterns), row-major, index = (px + py*face_size)*4 + channel",
+  "face_size": 128,
+  "face_order": [
+    "+X",
+    "-X",
+    "+Y",
+    "-Y",
+    "+Z",
+    "-Z"
+  ],
+  "face_convention": "matches THREE.CubeTexture images order; texel (px,py) -> u,v=((idx+0.5)/size)*2-1 in [-1,1]; row 0 = v=-1 (flipY=false, matches app/src/field/bakeCube.ts)",
+  "geodetic_to_geocentric": {
+    "applied": true,
+    "wgs84_flattening": 0.0033528106647474805,
+    "note": "cube direction (geocentric) converted to geodetic latitude before sampling the EPSG:4326 source raster; see build/wgs84.py"
+  },
+  "channels": {
+    "R": "natural-log density: log(max(density_per_sqm, floor)); floor=1.0; decode with exp(R). Unit: nematodes/m^2. Unchanged by this update -- see validation.r_a_byte_identical.",
+    "G": "structure fraction: (omnivores + predators) / (sum of the five functional-group per100gSoil grids), in [0,1]. Denominator is the SUM OF THE FIVE GROUPS, not TotalNumber -- the two do NOT reconcile on real data (see validation.summation_trap): the five groups were modelled independently of TotalNumber_per100g.tif and sum to it with a global area-weighted ratio of 1.0875 (per-pixel ratio ranges 0.538 to 2.330). Normalising by TotalNumber instead would silently encode that model disagreement as ecology -- see the channel ruling. Provenance: ETH Research Collection doi:10.3929/ethz-b-000354394 (item 6f6b1997-f1ba-4c85-8fc6-a7d68dc71234), files bacterivores_per100gSoil.tif, fungivores_per100gSoil.tif, herbivores_per100gSoil.tif, omnivores_per100gSoil.tif, predators_per100gSoil.tif.",
+    "B": "bootstrap coefficient of variation (per-pixel model uncertainty), un-diluted to the land-only mean (see uncertainty.land_mean_from_diluted -- extract_grid's box average treats ocean as 0 for mass conservation, which is correct for a density but would silently understate uncertainty at coastal cells for a per-soil-sample statistic like CV). Dimensionless (std/mean of the 100-iteration bootstrap distribution). Deliberately NOT TotalNumber_Ensemble_CoefVar.tif -- seed-to-seed jitter of a single model run, not real bootstrap uncertainty -- shares the convenient 43201x21121 grid but would read as 'confidence' while measuring nothing of the kind. See the channel ruling. Provenance: ETH Research Collection doi:10.3929/ethz-b-000354035 (item 73e5c336-f3bd-46a7-990e-150ac581bc28), file TotalNumber_Bootstrap_CoefVar.tif, on a 43200x21120 native grid (one fewer row/column than the main 43201x21121 density grid, same tiepoint/pixel-scale) -- resampled via the same box-averaging extract_grid already uses for R, landing on the identical output mapping with no separate coordinate transform (see rebake_gb.py's module docstring for why that is exact for this grid, not an approximation).",
+    "A": "land fraction (0..1), unmodified from source extraction. Unchanged by this update -- see validation.r_a_byte_identical."
+  },
+  "polar_gap": {
+    "limit_deg": 88.0,
+    "note": "no source data beyond +/-88 deg geodetic; texels landing there are explicit no-data (R decodes to floor, A=0), not extrapolated",
+    "total_texels_affected": 32
+  },
+  "texel_ground_stats": {
+    "worst_case_km": 99.53472600060684,
+    "best_case_km": 44.01360637826371,
+    "rms_km": 72.03224363735504,
+    "solid_angle_ratio_max_over_min": 5.1141721185435385
+  },
+  "source": {
+    "density_npy": "out/total_persqm_density_512x256.npy",
+    "landfrac_npy": "out/total_persqm_landfrac_512x256.npy",
+    "source_row_coverage_actual": 0.024241276454713318,
+    "source_area_weighted_integral": 4.6166305567965525e+20,
+    "functional_groups": {
+      "doi": "10.3929/ethz-b-000354394",
+      "item_uuid": "6f6b1997-f1ba-4c85-8fc6-a7d68dc71234",
+      "files": {
+        "bacterivores": "6394a9df-fe27-4bef-b712-f4f3aeb2189f",
+        "fungivores": "2eb513f5-dbd5-4dd8-becd-ae0699e6840a",
+        "herbivores": "c4de346b-d8ae-4b02-a955-52ddb0222f4e",
+        "omnivores": "ed1a9f1e-1e45-4224-8969-3236fa1b3365",
+        "predators": "62f5d623-90a7-43dc-a87f-c84f89fb9210"
+      }
+    },
+    "total_per100g": {
+      "doi": "10.3929/ethz-b-000354035",
+      "item_uuid": "73e5c336-f3bd-46a7-990e-150ac581bc28",
+      "bitstream_uuid": "9c6f6a0d-a7cd-4261-aa1c-48924fb53374",
+      "file": "TotalNumber_per100g.tif"
+    },
+    "bootstrap_coefvar": {
+      "doi": "10.3929/ethz-b-000354035",
+      "item_uuid": "73e5c336-f3bd-46a7-990e-150ac581bc28",
+      "bitstream_uuid": "137ecc0c-2673-40fd-a9db-a4b4839bde33",
+      "file": "TotalNumber_Bootstrap_CoefVar.tif"
+    },
+    "not_used_ensemble_coefvar": {
+      "bitstream_uuid": "106718a3-d351-4907-a22c-405de8fa19e3",
+      "file": "TotalNumber_Ensemble_CoefVar.tif",
+      "reason": "seed-to-seed jitter of a single model run, not real bootstrap uncertainty -- shares the convenient 43201x21121 grid but would read as 'confidence' while measuring nothing of the kind. See the channel ruling."
+    }
+  },
+  "validation": {
+    "baked_cube_integral": 4.628036382909247e+20,
+    "published_total": 4.4e+20,
+    "ratio_baked_to_source": 1.0024705953773803,
+    "ratio_baked_to_published": 1.0518264506611925,
+    "floor_contamination_exact": 352408571296651.7,
+    "floor_contamination_fraction_of_published": 8.009285711287538e-07,
+    "n_floored_texels": 67384,
+    "n_texels_total": 98304,
+    "floored_texel_audit": {
+      "note": "~70% of texels decode to the DENSITY_FLOOR placeholder (log(1.0)) rather than a real measurement. That is expected, not a bug: Earth is ~70% ocean, the source raster is NaN there (converted to density=0 at extraction time), and this bake floors density=0 to avoid storing log(0)=-inf. Confirmed below by cross-checking the A (land_fraction) channel: every floored texel has land_fraction exactly 0 -- if this were ever >0 it would mean real land got clamped to the floor, which would be a genuine bug.",
+      "n_floored_with_land_fraction_gt_0": 0,
+      "max_land_fraction_among_floored_texels": 0.0,
+      "confirmed_ocean_or_polar_gap_only": true
+    },
+    "r_a_byte_identical": {
+      "face_0": {
+        "R_byte_identical": true,
+        "A_byte_identical": true
+      },
+      "face_1": {
+        "R_byte_identical": true,
+        "A_byte_identical": true
+      },
+      "face_2": {
+        "R_byte_identical": true,
+        "A_byte_identical": true
+      },
+      "face_3": {
+        "R_byte_identical": true,
+        "A_byte_identical": true
+      },
+      "face_4": {
+        "R_byte_identical": true,
+        "A_byte_identical": true
+      },
+      "face_5": {
+        "R_byte_identical": true,
+        "A_byte_identical": true
+      },
+      "all_faces_r_and_a_byte_identical": true
+    },
+    "structure_fraction": {
+      "global_area_and_abundance_weighted": 0.13614881942212786,
+      "published_table1": 0.134,
+      "relative_error": 0.016035965836775048,
+      "hard_fail_relative_tolerance": 0.1,
+      "n_texels_clipped_to_0_1": 0,
+      "max_clip_extent": 0.0,
+      "g_min_over_land": 0.024574859870000555,
+      "g_max_over_land": 0.444327050553443
+    },
+    "summation_trap": {
+      "note": "do the five functional-group grids sum to the independently modelled TotalNumber_per100g grid? NO -- see per_pixel_ratio_* below. G is normalised by sum_five (the five groups), not TotalNumber, per the channel ruling.",
+      "global_area_weighted_sum_five_over_total": 1.08749231849606,
+      "per_pixel_ratio_min": 0.5377245830779822,
+      "per_pixel_ratio_median": 1.0857505587978127,
+      "per_pixel_ratio_max": 2.329733493290516
+    },
+    "bootstrap_cv": {
+      "n_land_cells": 32918,
+      "min": 0.06376571208238602,
+      "max": 0.5451788306236267,
+      "mean": 0.18877131410795098,
+      "median": 0.18172416721378237,
+      "raw_diluted_percentiles_from_extraction": {
+        "min": 0.0006530850496184419,
+        "p05": 0.047246907857314696,
+        "p25": 0.13670581571104498,
+        "p50": 0.17352342810903632,
+        "p75": 0.21505162714088585,
+        "p95": 0.2796409808665783,
+        "p99": 0.3478735234724571,
+        "max": 0.5451788127867022
+      },
+      "land_frac_cross_check_vs_R": {
+        "label": "bootstrap_vs_R",
+        "mean_abs_diff": 0.0006162380219336683,
+        "max_abs_diff": 0.3706582337617874,
+        "n_cells_diff_gt_0.05": 308,
+        "n_cells_diff_gt_0.3": 3,
+        "total_cells": 131072
+      }
+    }
+  },
+  "bytes_per_face": 131072,
+  "total_bytes": 786432
+}

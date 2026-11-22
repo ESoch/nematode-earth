@@ -1,0 +1,93 @@
+# Cloudflare Pages response headers. Copied verbatim from `public/` to the
+# root of `dist/` by `vite build`, since Pages reads `_headers` from the
+# root of the deployed output. See docs/deploy-cloudflare-pages.md for the
+# measurements and reasoning behind these two groups.
+#
+# Syntax: https://developers.cloudflare.com/pages/configuration/headers/
+# One path pattern per block; indented lines below it are the headers
+# applied to matches. Later blocks do not override earlier ones for the
+# same header on an overlapping path -- keep patterns as specific as the
+# intent requires.
+
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+
+# --- Atlas data: brotli-precompressed at build time (see
+# scripts/precompress-data.mjs) because Cloudflare's documented default
+# compression does not cover application/octet-stream, which is what an
+# unrecognized `.bin` extension serves as. Content-Encoding here is a
+# factual declaration of what's already on disk, not a request for
+# Cloudflare to compress anything -- if this ever stops matching reality
+# (e.g. someone drops the precompression step), every atlas fetch breaks
+# with a byte-length mismatch in loadCube.ts, loudly, not silently.
+#
+# Cache-Control is long-lived and immutable: these paths are NOT
+# content-hashed by Vite (they pass through from public/ under a fixed
+# name), so a future rebake that changes what a path's bytes MEAN must
+# ship under a new path (e.g. cube_plain_128 -> cube_plain_128_v2) --
+# otherwise a returning visitor's browser can serve stale atlas data for
+# up to a year. See docs/deploy-cloudflare-pages.md.
+/data/*.bin
+  Content-Encoding: br
+  Content-Type: application/octet-stream
+  Cache-Control: public, max-age=31536000, immutable
+
+# JSON sidecars (cube_meta.json, samples_meta.json) travel with the .bin
+# files they describe and are covered by Cloudflare's default compression
+# (application/json IS on the documented default content-type list, unlike
+# octet-stream) -- only the cache policy needs stating here.
+/data/*.json
+  Cache-Control: public, max-age=31536000, immutable
+
+# --- The no-WebGPU poster. Referenced only by viewer.html's fallback, so a
+# visitor who can run the live view never fetches it at all. NOT
+# content-hashed by Vite -- it passes through from public/ under a fixed
+# name -- so the same rule as /data/* applies: the version is IN the
+# filename, and a re-capture must ship as _v2 rather than overwrite _v1,
+# or a returning visitor can be served the old frame for up to a year.
+# 17.4 KiB AVIF / 58.6 KiB JPEG at 1200x800; one of the two is fetched,
+# never both.
+/poster_veil_11500km_v1.*
+  Cache-Control: public, max-age=31536000, immutable
+
+# --- Build assets: Vite content-hashes these filenames
+# (assets/main-<hash>.js), so a changed file is a changed URL by
+# construction -- safe to cache forever.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# --- Entry points: NOT hashed, and are exactly what points a returning
+# visitor at the (immutably-cached) hashed assets above -- these must
+# always revalidate so a deploy is visible on the next load, not after a
+# stale HTML page's cache expires.
+/index.html
+  Cache-Control: public, max-age=0, must-revalidate
+
+/viewer.html
+  Cache-Control: public, max-age=0, must-revalidate
+
+/about.html
+  Cache-Control: public, max-age=0, must-revalidate
+
+# Pages can serve these as clean URLs, so cover the requested paths too.
+/
+  Cache-Control: public, max-age=0, must-revalidate
+
+/viewer
+  Cache-Control: public, max-age=0, must-revalidate
+
+/about
+  Cache-Control: public, max-age=0, must-revalidate
+
+/404.html
+  Cache-Control: public, max-age=0, must-revalidate
+
+/favicon.svg
+  Cache-Control: public, max-age=0, must-revalidate
+
+# Derived from the same checked-in source files as the exhibit.
+# Readers can inspect the evidence directly and receive updated copies.
+/sources/*
+  Content-Type: text/plain; charset=utf-8
+  Cache-Control: public, max-age=0, must-revalidate

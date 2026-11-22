@@ -1,0 +1,531 @@
+/* The live exhibit sits over the renderer. Scoped so the static fallback and
+   methods page keep their own reading layouts. The older gradient definitions
+   remain available to diagnostics; these compact surfaces need no canvas-wide
+   scrim or blur pass. */
+.viewer-exhibit {
+  --exhibit-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --exhibit-serif: 'Iowan Old Style', 'Palatino Linotype', 'Book Antiqua', Georgia, serif;
+  --exhibit-surface: #0c1118;
+  --exhibit-line: #35414c;
+  --exhibit-pad: max(clamp(20px, 3.5vw, 64px), env(safe-area-inset-left), env(safe-area-inset-right));
+  font-family: var(--exhibit-font);
+}
+.viewer-exhibit canvas { position: fixed; inset: 0; }
+/* Layout-only rectangle: the camera fits here while rendering full-bleed. */
+.viewer-scene-space {
+  position: fixed;
+  pointer-events: none;
+  left: calc(var(--hud-right, 390px) + 24px);
+  right: max(var(--exhibit-pad), env(safe-area-inset-right));
+  top: calc(var(--topbar-height, 44px) + max(22px, env(safe-area-inset-top)) + 24px);
+  bottom: calc(var(--transport-height, 78px) + max(45px, env(safe-area-inset-bottom)) + 24px);
+}
+.viewer-exhibit [hidden] { display: none !important; }
+.viewer-exhibit :is(button, a, input, summary):focus-visible {
+  outline: 2px solid #dce9f2;
+  outline-offset: 5px;
+}
+.viewer-exhibit button { font: inherit; cursor: pointer; }
+.viewer-exhibit #hud-scrim { display: none; }
+.viewer-exhibit #topbar::before { content: none; }
+.viewer-exhibit #topbar {
+  inset: max(22px, env(safe-area-inset-top)) var(--exhibit-pad) auto;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  z-index: 3;
+  font: 14px/1.4 var(--exhibit-font);
+  text-shadow: none;
+}
+.viewer-wordmark {
+  font: 25px/1.1 var(--exhibit-serif);
+  color: var(--hud-key);
+  white-space: nowrap;
+}
+.viewer-nav { display: flex; align-items: center; gap: 26px; }
+.viewer-exhibit .viewer-nav .hud-about {
+  padding: 10px 0;
+  min-height: auto;
+  text-decoration: none;
+  color: var(--hud-body);
+}
+.viewer-nav button {
+  pointer-events: auto;
+  background: var(--exhibit-surface);
+  color: var(--hud-key);
+  border: 1px solid var(--exhibit-line);
+  border-radius: 6px;
+  min-height: 44px;
+  padding: 0 17px;
+}
+.viewer-nav button:hover { background: #1b2630; }
+.viewer-exhibit #hud {
+  left: var(--exhibit-pad);
+  right: auto;
+  bottom: calc(var(--transport-height, 78px) + max(45px, env(safe-area-inset-bottom)) + 24px);
+  width: min(350px, calc(100vw - 2 * var(--exhibit-pad)));
+  max-height: calc(100dvh - 270px);
+  overflow: auto;
+  scrollbar-width: thin;
+  font: 14px/1.5 var(--exhibit-font);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+  padding: 20px 22px;
+  margin-left: -22px;
+  border-radius: 8px;
+  background: none;
+}
+.viewer-exhibit #hud.is-clipped { mask-image: none; -webkit-mask-image: none; }
+.hud-headline {
+  margin: 0 0 12px;
+  font: 38px/1.08 var(--exhibit-serif);
+  font-weight: 400;
+  letter-spacing: -0.025em;
+  color: var(--hud-key);
+  max-width: 12ch;
+}
+.hud-deck { margin: 0; color: var(--hud-body); max-width: 29ch; }
+.viewer-exhibit .hud-quote {
+  font: 24px/1.28 var(--exhibit-serif);
+  color: var(--hud-quote);
+  max-width: 28ch;
+}
+.viewer-exhibit .hud-attrib {
+  margin-top: 12px;
+  font: 12px/1.5 var(--exhibit-font);
+}
+.viewer-exhibit .hud-count { margin: 23px 0 10px; }
+.viewer-exhibit .hud-count-label {
+  font-size: 12px;
+  letter-spacing: 0;
+  text-transform: none;
+  margin-bottom: 4px;
+}
+.viewer-exhibit .hud-count-value {
+  font: 28px/1.2 var(--exhibit-serif);
+  font-variant-numeric: tabular-nums;
+}
+.viewer-exhibit .hud-count-compare { display: none; }
+.viewer-exhibit .hud-readouts { color: var(--hud-dim); font-size: 12px; }
+.viewer-exhibit .hud-readouts b { font-weight: 400; color: var(--hud-body); }
+.viewer-exhibit #hud a {
+  pointer-events: auto;
+  color: inherit;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  text-decoration-color: #516371;
+}
+.viewer-exhibit #hud a:hover { text-decoration-color: currentColor; }
+.hud-layer-status { color: var(--hud-accent); font-size: 12px; margin-top: 8px; }
+.hud-layer-status:empty { display: none; }
+
+.viewer-exhibit #transport {
+  position: fixed;
+  z-index: 3;
+  left: var(--exhibit-pad);
+  right: var(--exhibit-pad);
+  transform: none;
+  bottom: max(45px, calc(env(safe-area-inset-bottom) + 22px));
+  width: auto;
+  box-sizing: border-box;
+  display: block;
+  padding: 15px 18px;
+  border: 1px solid var(--exhibit-line);
+  border-radius: 10px;
+  background: #0c1118;
+  font: 13px/1.3 var(--exhibit-font);
+  color: var(--hud-body);
+}
+.transport-row {
+  display: grid;
+  grid-template-columns: 155px minmax(0, 1fr) 34px 38px;
+  gap: 18px;
+  align-items: center;
+}
+.opening-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; margin-top: 6px; }
+.opening-controls[data-empty='true'] { margin-top: 0; }
+.opening-readiness { flex: 1 1 240px; max-width: 58ch; margin: 0; font-size: 11px; line-height: 1.4; color: var(--hud-dim); }
+.opening-actions { display: flex; flex-wrap: wrap; gap: 6px 12px; }
+.viewer-exhibit :is(.opening-actions button, .retry-data) { min-height: 44px; font-size: 13px; border-radius: 5px; background: none; border: 1px solid var(--exhibit-line); color: var(--hud-body); padding: 0 10px; }
+.viewer-exhibit .retry-data[aria-disabled='true'] { cursor: default; opacity: 0.55; }
+.opening-menu-actions:empty { display: none; }
+.opening-menu-actions .opening-actions { gap: 8px; flex-wrap: nowrap; }
+.opening-menu-actions .opening-actions button { flex: 1 1 auto; }
+.viewer-exhibit #transport button:disabled { cursor: default; opacity: 0.55; }
+@media (max-width: 700px) {
+  .opening-readiness { flex-basis: 100%; }
+  .opening-actions { width: 100%; justify-content: space-between; gap: 6px; }
+}
+/* On short portrait screens the title and live layer states carry the guide.
+   Full phase copy remains in its live announcement; dataset limits are also
+   in Explore the data. Loading/errors stay visible with natural wrapping. */
+.viewer-exhibit #transport[data-compact-guide='true'] { padding-block: 8px; }
+#transport[data-compact-guide='true'] .sweep-caption-description { display: none; }
+#transport[data-compact-guide='true'] .sweep-guide { margin-bottom: 8px; }
+#transport[data-compact-guide='true'] .sweep-layers { margin-top: 6px; }
+#transport[data-compact-guide='true'] .sweep-intro-premise { font-size: 11px; }
+#transport[data-compact-guide='true'] .sweep-intro-quote { font-size: 15px; }
+.sweep-guide { margin: 0 0 14px; }
+.sweep-intro { max-width: 54ch; }
+.sweep-intro-premise {
+  margin: 0 0 4px;
+  color: var(--hud-body);
+  font: 12px/1.4 var(--exhibit-font);
+}
+.sweep-intro-quote {
+  margin: 0;
+  color: var(--hud-quote);
+  font: 18px/1.25 var(--exhibit-serif);
+  animation: cobb-quote-arrive 480ms ease-out both;
+}
+@keyframes cobb-quote-arrive {
+  from { opacity: 0.72; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.viewer-exhibit .sweep-intro-source {
+  display: inline-block;
+  margin-top: 4px;
+  color: var(--hud-dim);
+  font: 11px/1.4 var(--exhibit-font);
+  text-decoration-color: var(--exhibit-line);
+  text-underline-offset: 3px;
+}
+/* All captions share a grid cell and reserve their largest height. Changing
+   phase must not resize the dock, the camera's free region, or the globe. */
+.sweep-captions { display: grid; }
+.sweep-caption {
+  grid-area: 1 / 1;
+  opacity: 0;
+  transition: opacity 220ms ease;
+  pointer-events: none;
+}
+.sweep-caption[data-active='true'] { opacity: 1; }
+.sweep-caption-title { color: var(--hud-key); font: 20px/1.2 var(--exhibit-serif); }
+.sweep-caption-description { max-width: 48ch; color: var(--hud-body); font-size: 12px; line-height: 1.5; margin-top: 4px; }
+.sweep-layers {
+  display: flex;
+  gap: 24px;
+  list-style: none;
+  padding: 0;
+  margin: 10px 0 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--hud-dim);
+}
+.sweep-layers li { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.sweep-layers li[data-status='leaving'] { color: var(--hud-key); }
+.sweep-layers li[data-status='gone'] { color: #93b6a8; }
+.sweep-layer-symbol { width: 12px; text-align: center; font-size: 14px; line-height: 1; }
+.sweep-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sweep-intro-quote { animation: none; }
+  .sweep-caption { transition: none; }
+}
+.viewer-exhibit .rail-row button {
+  min-height: 44px;
+  border-radius: 5px;
+  font: 13px/1.3 var(--exhibit-font);
+}
+.viewer-exhibit #transport .play-button {
+  color: #0c1118;
+  background: #e6f0f7;
+  border: 1px solid #e6f0f7;
+  padding: 0 12px;
+  font-weight: 600;
+}
+.viewer-exhibit #transport .play-button:hover { background: white; }
+.viewer-exhibit #transport .replay-button {
+  background: none;
+  border-color: transparent;
+  padding: 0;
+  font-size: 24px;
+  color: var(--hud-body);
+}
+.timeline-track { min-width: 0; }
+.timeline-labels { display: flex; justify-content: space-between; font-size: 11px; color: var(--hud-body); }
+.viewer-exhibit .rail-row input[type='range'] {
+  appearance: none;
+  -webkit-appearance: none;
+  height: 28px;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.viewer-exhibit .rail-row input[type='range']::-webkit-slider-runnable-track {
+  height: 3px;
+  border-radius: 2px;
+  background: linear-gradient(to right, #dce9f2 var(--progress, 0%), #43505e var(--progress, 0%));
+}
+.viewer-exhibit .rail-row input[type='range']::-moz-range-track { height: 3px; background: #43505e; border-radius: 2px; }
+.viewer-exhibit .rail-row input[type='range']::-moz-range-progress { height: 3px; background: #dce9f2; }
+.viewer-exhibit .rail-row input[type='range']::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 13px;
+  height: 13px;
+  border: 2px solid #0c1118;
+  border-radius: 50%;
+  background: #e6f0f7;
+  margin-top: -5px;
+}
+.viewer-exhibit .rail-row input[type='range']::-moz-range-thumb {
+  width: 10px; height: 10px; border: 2px solid #0c1118; border-radius: 50%; background: #e6f0f7;
+}
+.viewer-exhibit .transport-time { font-size: 11px; font-variant-numeric: tabular-nums; }
+.viewer-gestures {
+  position: fixed;
+  bottom: max(15px, env(safe-area-inset-bottom));
+  left: 0;
+  right: 0;
+  text-align: center;
+  font: 11px/1.4 var(--exhibit-font);
+  color: var(--hud-dim);
+  pointer-events: none;
+}
+.viewer-gestures[data-quality-limit='true'] { color: var(--hud-body); }
+
+.viewer-exhibit #explore-dialog {
+  color-scheme: dark;
+  box-sizing: border-box;
+  width: min(480px, calc(100vw - 32px));
+  max-height: calc(100dvh - 48px);
+  margin: auto max(24px, 4vw) auto auto;
+  padding: 26px;
+  border: 1px solid var(--exhibit-line);
+  border-radius: 12px;
+  background: #0c1118;
+  color: var(--hud-body);
+  font: 14px/1.55 var(--exhibit-font);
+  scrollbar-width: thin;
+}
+#explore-dialog::backdrop { background: rgba(0, 0, 0, 0.38); }
+.dialog-heading { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 15px; }
+.dialog-heading h2 { margin: 0; font: 28px/1.15 var(--exhibit-serif); color: var(--hud-key); }
+.dialog-close { color: var(--hud-body); border: 1px solid var(--exhibit-line); background: none; border-radius: 5px; min-height: 44px; padding: 0 12px; }
+.layer-control { display: flex; align-items: center; gap: 24px; padding: 18px 0; cursor: pointer; border-bottom: 1px solid #28323d; }
+.layer-copy { flex: 1; }
+.layer-title { display: block; color: var(--hud-key); font-weight: 500; margin-bottom: 4px; }
+.layer-description { display: block; font-size: 12px; color: var(--hud-dim); }
+.layer-control input { width: 22px; height: 22px; accent-color: #dce9f2; flex-shrink: 0; cursor: pointer; }
+.dialog-note { font-size: 12px; color: var(--hud-dim); margin: 14px 0 26px; }
+.dialog-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; margin-top: 24px; }
+.dialog-actions a { color: var(--hud-body); min-height: 44px; display: inline-flex; align-items: center; }
+.fullscreen-status { color: var(--hud-dim); font-size: 12px; }
+.comparison-section { margin-top: 22px; }
+.comparison-section h3 { font: 22px/1.2 var(--exhibit-serif); color: var(--hud-key); margin: 0 0 15px; }
+.viewer-exhibit .hud-finding { margin: 0 0 22px; }
+.viewer-exhibit .hud-finding-result { margin-top: 8px; }
+.viewer-exhibit .hud-finding-stats { margin-top: 10px; line-height: 1.6; }
+.viewer-exhibit .hud-finding-link { margin-top: 10px; font-size: 12px; }
+.comparison-section .rail-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0 8px; }
+.comparison-section .rail-row input { grid-column: 1 / -1; grid-row: 2; }
+.comparison-section .hud-accent { text-align: right; }
+.comparison-section .rail-caption { margin-top: 8px; font-size: 12px; }
+.viewer-exhibit .keyboard-details { margin-top: 28px; padding-top: 18px; border-top: 1px solid #28323d; }
+.keyboard-details summary { cursor: pointer; color: var(--hud-key); min-height: 30px; }
+.viewer-exhibit .hud-keys { columns: 1; font-size: 12px; }
+.viewer-exhibit .hud-keys-title { text-transform: none; letter-spacing: 0; font-size: 12px; }
+.viewer-exhibit .hud-keys-row { margin: 7px 0; }
+
+@media (pointer: coarse) {
+  .viewer-exhibit .rail-row input[type='range'] { height: 44px; }
+  .viewer-exhibit .rail-row input[type='range']::-webkit-slider-thumb { width: 24px; height: 24px; margin-top: -10.5px; }
+  .viewer-exhibit .rail-row input[type='range']::-moz-range-thumb { width: 20px; height: 20px; }
+}
+@media (max-width: 700px), (max-width: 900px) and (orientation: portrait) {
+  .viewer-exhibit #topbar { flex-wrap: wrap; gap: 8px; top: max(18px, env(safe-area-inset-top)); }
+  .viewer-wordmark { font-size: 22px; }
+  .viewer-nav { gap: 15px; }
+  .viewer-exhibit .viewer-nav .hud-about { font-size: 12px; }
+  .viewer-nav button { font-size: 12px; padding: 0 10px; }
+  .viewer-exhibit #hud {
+    bottom: calc(var(--transport-height, 130px) + max(45px, env(safe-area-inset-bottom)) + 20px);
+    padding: 12px 0;
+    margin-left: 0;
+    width: calc(100vw - 2 * var(--exhibit-pad));
+    background: none;
+    max-height: calc(100dvh - 270px);
+  }
+  .hud-headline { font-size: 30px; max-width: 17ch; margin-bottom: 8px; }
+  .viewer-exhibit .hud-story {
+    --story-height: 144px;
+    position: fixed;
+    top: calc(var(--topbar-height, 76px) + max(18px, env(safe-area-inset-top)) + 24px);
+    left: max(var(--exhibit-pad), env(safe-area-inset-left));
+    right: max(var(--exhibit-pad), env(safe-area-inset-right));
+    height: var(--story-height);
+  }
+  .viewer-exhibit .hud-introduction,
+  .viewer-exhibit .hud-quote { position: static; }
+  .viewer-scene-space {
+    left: max(var(--exhibit-pad), env(safe-area-inset-left));
+    top: calc(var(--topbar-height, 76px) + max(18px, env(safe-area-inset-top)) + 24px + 144px + 12px);
+    bottom: calc(100dvh - var(--hud-top, 560px) + 14px);
+  }
+  .hud-deck { font-size: 13px; max-width: 36ch; }
+  .viewer-exhibit .hud-quote { font-size: 19px; max-width: 34ch; }
+  .viewer-exhibit .hud-count { margin-top: 16px; margin-bottom: 6px; }
+  .viewer-exhibit .hud-count-value { font-size: 25px; }
+  .viewer-exhibit .hud-readouts { display: flex; flex-wrap: wrap; gap: 3px 14px; font-size: 11px; }
+  .viewer-exhibit #transport {
+    padding: 12px 14px;
+  }
+  .viewer-exhibit #transport .transport-row {
+    grid-template-columns: minmax(0, 1fr) 40px;
+    gap: 4px 12px;
+  }
+  /* On a phone the guide is the narrative. Reuse the former story space for
+     the globe instead of stacking a second explanation above it. */
+  .viewer-exhibit .hud-story { display: none; }
+  .viewer-scene-space {
+    top: calc(var(--topbar-height, 76px) + max(18px, env(safe-area-inset-top)) + 20px);
+  }
+  .sweep-caption-title { font-size: 19px; }
+  .sweep-layers { justify-content: space-between; gap: 8px; font-size: 10px; }
+  .sweep-layers li { gap: 4px; }
+  .viewer-exhibit #transport .play-button { grid-column: 1; grid-row: 1; justify-self: start; padding: 0 14px; }
+  .timeline-track { grid-column: 1; grid-row: 2; }
+  .viewer-exhibit .transport-time { grid-column: 2; grid-row: 2; text-align: center; }
+  .viewer-exhibit #transport .replay-button { grid-column: 2; grid-row: 1; }
+  .viewer-exhibit #explore-dialog { margin: auto auto max(16px, env(safe-area-inset-bottom)); padding: 22px; }
+}
+@media (max-width: 400px) {
+  .viewer-exhibit #topbar { display: grid; grid-template-columns: 1fr; }
+  .viewer-nav { justify-content: space-between; }
+}
+/* A compact portrait cannot hold the full quotation, globe and transport at
+   once. Keep the reading version on the methods page; don't cover the subject. */
+@media (max-width: 700px) and (max-height: 700px) {
+  .viewer-exhibit .hud-quote,
+  .viewer-exhibit .hud-deck { display: none; }
+  .hud-headline { font-size: 25px; }
+  .viewer-exhibit #hud {
+    bottom: calc(var(--transport-height, 130px) + max(45px, env(safe-area-inset-bottom)) + 10px);
+    padding: 6px 0;
+  }
+  .viewer-exhibit .hud-count { margin: 0 0 4px; }
+  .viewer-exhibit .hud-count-value { font-size: 22px; }
+  .viewer-exhibit .hud-readouts { font-size: 10px; }
+  .viewer-exhibit .hud-layer-status { font-size: 10px; margin-top: 4px; }
+  .viewer-exhibit .hud-story { --story-height: 72px; }
+  .viewer-scene-space {
+    top: calc(var(--topbar-height, 76px) + max(18px, env(safe-area-inset-top)) + 16px);
+  }
+}
+@media (max-width: 700px) and (max-height: 600px) {
+  .viewer-exhibit .hud-story { display: none; }
+  .viewer-scene-space {
+    top: calc(var(--topbar-height, 76px) + max(18px, env(safe-area-inset-top)) + 16px);
+  }
+}
+@media (max-width: 700px) and (max-height: 600px) and (orientation: portrait) {
+  /* Give the subject priority on the shortest phones. Credits and the model
+     explanation remain in Explore the data; don't shrink Earth to a dot. */
+  .viewer-exhibit #hud { display: none; }
+  .viewer-scene-space {
+    bottom: calc(var(--transport-height, 238px) + max(45px, env(safe-area-inset-bottom)) + 24px);
+  }
+}
+@media (max-height: 560px) and (min-width: 701px) {
+  .viewer-exhibit #hud { bottom: 128px; max-height: calc(100dvh - 200px); }
+  .hud-headline { font-size: 28px; }
+  .viewer-exhibit .hud-quote { font-size: 19px; }
+  .viewer-exhibit .hud-count { margin-top: 12px; }
+  .viewer-exhibit .hud-deck { display: none; }
+}
+@media (max-height: 500px) {
+  .viewer-exhibit .hud-introduction,
+  .viewer-exhibit .hud-quote { display: none; }
+  .viewer-exhibit #hud { bottom: 135px; max-height: calc(100dvh - 220px); }
+  .viewer-exhibit .hud-count { margin-top: 0; }
+}
+@media (max-height: 500px) and (orientation: landscape) {
+  .viewer-exhibit #topbar { display: flex; flex-wrap: nowrap; top: max(14px, env(safe-area-inset-top)); gap: 16px; }
+  .viewer-wordmark { font-size: 20px; }
+  .viewer-nav { gap: 14px; }
+  .viewer-exhibit .viewer-nav .hud-about { font-size: 12px; }
+  .viewer-exhibit #transport {
+    padding: 6px 12px;
+    bottom: max(32px, env(safe-area-inset-bottom));
+  }
+  .viewer-exhibit #transport .transport-row {
+    grid-template-columns: 140px minmax(0, 1fr) 32px 36px;
+    gap: 12px;
+  }
+  .sweep-guide { margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+  .sweep-captions { flex: 1; }
+  .sweep-caption-title { font-size: 16px; }
+  .sweep-caption-description { font-size: 11px; margin-top: 2px; }
+  .sweep-layers { gap: 8px; margin-top: 0; }
+  .sweep-layers li { gap: 3px; font-size: 10px; }
+  .viewer-exhibit #transport :is(.play-button, .timeline-track, .transport-time, .replay-button) {
+    grid-column: auto;
+    grid-row: auto;
+  }
+  .viewer-exhibit #transport .play-button { padding: 0 10px; }
+  .timeline-labels { display: none; }
+  .viewer-gestures { bottom: max(8px, env(safe-area-inset-bottom)); }
+  .viewer-exhibit #hud {
+    width: 210px;
+    margin-left: 0;
+    padding: 0;
+    bottom: calc(var(--transport-height, 58px) + max(32px, env(safe-area-inset-bottom)) + 24px);
+    max-height: calc(100dvh - 170px);
+  }
+  .viewer-exhibit .hud-story { display: none; }
+  .viewer-exhibit .hud-count-value { font-size: 24px; }
+  .viewer-scene-space {
+    left: calc(var(--hud-right, 240px) + 20px);
+    top: calc(var(--topbar-height, 44px) + max(14px, env(safe-area-inset-top)) + 12px);
+    bottom: calc(var(--transport-height, 58px) + max(32px, env(safe-area-inset-bottom)) + 12px);
+  }
+}
+@media (max-height: 500px) and (max-width: 700px) and (orientation: landscape) {
+  .sweep-guide { display: block; }
+  .sweep-caption-description { display: none; }
+  .sweep-layers { margin-top: 5px; justify-content: flex-start; gap: 18px; }
+}
+
+/* Laptop/desktop: share the header's edge gutters, keeping the guide readable
+   while the timeline uses the available width. The two-column dock is also
+   shallower than stacking guide, transport and actions in a capped column. */
+@media (min-width: 1100px) and (min-height: 501px) {
+  .viewer-exhibit #transport {
+    display: grid;
+    grid-template-columns: minmax(18rem, 24rem) minmax(0, 1fr);
+    column-gap: clamp(24px, 2.5vw, 40px);
+    row-gap: 8px;
+    align-items: center;
+  }
+  #transport > .sweep-guide {
+    grid-column: 1;
+    grid-row: 1 / 3;
+    margin: 0;
+    min-width: 0;
+  }
+  #transport > .transport-row {
+    grid-column: 2;
+    grid-row: 1;
+    min-width: 0;
+    grid-template-columns: 155px minmax(0, 1fr) 34px 44px;
+  }
+  #transport > .opening-controls {
+    grid-column: 2;
+    grid-row: 2;
+    min-width: 0;
+    margin-top: 0;
+    justify-content: flex-end;
+  }
+}

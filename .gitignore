@@ -1,0 +1,28 @@
+node_modules/
+dist/
+.DS_Store
+.env
+.env.*
+
+# Local diagnostics, worktrees, and workstation inventories
+.claude/
+.Codex/worktrees/
+.dual-graph-pro/
+.superpowers/
+.diag-browser/
+.diag-lod/
+.hud-diag/
+docs/superpowers/results/2026-09-19-host-cleanup-candidates.md
+docs/superpowers/results/2026-09-22-host-cache-cleanup.md
+
+# Upstream rasters, download caches, and intermediate pipeline products
+data/raw/
+data/cache/
+*.tif
+*.npy
+pipeline/out/
+pipeline/cache/
+pipeline/.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/

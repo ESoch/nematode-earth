@@ -1,0 +1,43 @@
+{
+  "field": "built_up_fraction",
+  "units": "fraction (0-1, dimensionless)",
+  "projection": "plain",
+  "format": "RGBA16Float (uint16 little-endian bit patterns), row-major, index = (px + py*face_size)*4 + channel",
+  "face_size": 128,
+  "km_per_texel": 78.18393279695536,
+  "face_order": [
+    "+X",
+    "-X",
+    "+Y",
+    "-Y",
+    "+Z",
+    "-Z"
+  ],
+  "face_convention": "matches THREE.CubeTexture images order; texel (px,py) -> u,v=((idx+0.5)/size)*2-1 in [-1,1]; row 0 = v=-1 (flipY=false, matches app/src/field/bakeCube.ts)",
+  "geodetic_to_geocentric": {
+    "applied": true,
+    "wgs84_flattening": 0.0033528106647474805
+  },
+  "channels": {
+    "R": "built-up fraction, raw (0..1, no log encoding -- values are naturally bounded and mostly near 0)",
+    "G": "reserved (0)",
+    "B": "reserved (0)",
+    "A": "validity: always 1.0 -- texels beyond GHSL's actual polar coverage are treated as genuinely 0 built-up (real: no cities in Antarctica), not missing data"
+  },
+  "coverage": {
+    "lat_limit_deg": -89.10041610517223,
+    "texels_beyond_coverage": 8,
+    "note": "GHSL clips a bit short of the poles (tiepoint lat0=89.0996, not 90.0); texels beyond are set to u=0, not extrapolated"
+  },
+  "source": {
+    "url": "https://jeodpp.jrc.ec.europa.eu/ftp/jrc-opendata/GHSL/GHS_BUILT_S_GLOBE_R2023A/GHS_BUILT_S_E2020_GLOBE_R2023A_4326_30ss/V1-0/GHS_BUILT_S_E2020_GLOBE_R2023A_4326_30ss_V1_0.zip",
+    "resolution": "30 arc-second (~0.93 km/px equator), EPSG:4326, epoch 2020",
+    "source_total_built_up_area_m2": 464568186170.89716
+  },
+  "validation": {
+    "baked_total_built_up_area_m2": 467203680164.976,
+    "ratio_baked_to_source": 1.0056729971455889
+  },
+  "bytes_per_face": 131072,
+  "total_bytes": 786432
+}

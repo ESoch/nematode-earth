@@ -1,0 +1,15 @@
+cff-version: 1.2.0
+message: >-
+  Cite this software when referring to the visualization. For scientific
+  findings and data products, cite the original works in THIRD_PARTY_NOTICES.md.
+type: software
+title: Nematode Earth
+authors:
+  - family-names: Soch
+    given-names: Ethan
+url: https://nematode.earth/
+license: MIT
+abstract: >-
+  Interactive WebGPU visualization of modelled terrestrial soil nematode
+  abundance, measured soil sample locations, and model uncertainty, with an
+  offline pipeline for preparing the display data.

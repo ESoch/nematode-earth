@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Soil dataset validation</title>
+<style>body{font:15px/1.5 system-ui;margin:32px;background:#10151a;color:#edf3ef}pre{white-space:pre-wrap;overflow-wrap:anywhere}a{color:#9fe1d0}</style>
+<h1>Soil dataset validation</h1>
+<p>Close other exhibit tabs before running these read-only GPU checks on the soil map.</p>
+<pre id="result" role="status">Starting GPU validation…</pre>
+<script type="module">
+  import { runSoilCoverageProbe } from '/src/experiments/soilCoverageProbe.ts'
+  import { runCubeOrientationProbe } from '/src/experiments/cubeOrientationProbe.ts'
+  import { runSoilCandidateProbe } from '/src/experiments/soilCandidateProbe.ts'
+  const output = document.getElementById('result')
+  try {
+    const coverage = await runSoilCoverageProbe()
+    output.textContent = `Coverage: ${JSON.stringify(coverage)}\nChecking geographic orientation…`
+    const orientation = await runCubeOrientationProbe()
+    output.textContent += `\nOrientation: ${orientation.pass}\nChecking candidate bytes and filtered samples…`
+    const candidate = await runSoilCandidateProbe('/data/soil_plain_512_v2')
+    output.textContent = JSON.stringify({ pass: coverage.pass && orientation.pass && candidate.pass, coverage, orientation, candidate }, null, 2)
+  } catch (error) { output.textContent = `FAILED: ${error.stack ?? error}` }
+</script>
+</html>
