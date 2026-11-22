@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import VIEWER_HTML from '../viewer.html?raw'
 import { ALWAYS_VISIBLE_HINTS } from '../src/hud/copy'
 import VIEWER_TS from '../src/viewer.ts?raw'
@@ -23,21 +23,22 @@ import VIEWER_TS from '../src/viewer.ts?raw'
  * compact rail this HUD was designed around.
  */
 
-/** Body of the first `@media (pointer: coarse)` block, braces balanced. */
-const coarseBlock = (() => {
-  const at = VIEWER_HTML.indexOf('@media (pointer: coarse)')
-  expect(at, 'no @media (pointer: coarse) block in viewer.html').toBeGreaterThan(-1)
-  const open = VIEWER_HTML.indexOf('{', at)
+function mediaBlock(css: string, media: string): string {
+  const at = css.indexOf(media)
+  expect(at, `no ${media} block`).toBeGreaterThan(-1)
+  const open = css.indexOf('{', at)
   let depth = 0
-  for (let i = open; i < VIEWER_HTML.length; i++) {
-    if (VIEWER_HTML[i] === '{') depth++
-    else if (VIEWER_HTML[i] === '}') {
+  for (let i = open; i < css.length; i++) {
+    if (css[i] === '{') depth++
+    else if (css[i] === '}') {
       depth--
-      if (depth === 0) return VIEWER_HTML.slice(open + 1, i)
+      if (depth === 0) return css.slice(open + 1, i)
     }
   }
-  throw new Error('unbalanced @media (pointer: coarse) block')
-})()
+  throw new Error(`unbalanced ${media} block`)
+}
+
+const coarseBlock = mediaBlock(VIEWER_HTML, '@media (pointer: coarse)')
 
 /** A `min-height`/`height` declaration in CSS px, given a selector's rule body. */
 function ruleFor(css: string, selector: string): string {
@@ -56,6 +57,15 @@ function pxOf(body: string, prop: string): number {
 }
 
 const MIN_TOUCH_PX = 44
+
+it('keeps the slider tracks visible when forced colors remove their backgrounds', async () => {
+  const { readFileSync } = await vi.importActual<{ readFileSync(path: URL, encoding: 'utf8'): string }>('node:fs')
+  const viewerCss = readFileSync(new URL('../src/hud/viewer.css', import.meta.url), 'utf8')
+  const colors = mediaBlock(viewerCss, '@media (forced-colors: active)')
+  for (const track of ['::-webkit-slider-runnable-track', '::-moz-range-track']) {
+    expect(ruleFor(colors, track)).toMatch(/border:\s*1px solid CanvasText/i)
+  }
+})
 
 describe('the browser must not steal the gesture', () => {
   it('declares touch-action: none on the canvas', () => {

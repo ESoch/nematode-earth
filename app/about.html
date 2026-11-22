@@ -339,6 +339,15 @@
           coverage. Marine nematode abundance there remains unknown.
           <a href="#soil-channel-contract">Soil channels and coverage</a>.
         </p>
+        <h3>Faint land areas nearly disappeared</h3>
+        <p>
+          The veil’s brightness already accounts for how much light passes through a
+          column. An earlier renderer applied its opacity a second time. That made
+          low-density land look almost as dark as open ocean. The corrected viewer
+          applies opacity once. We checked the emitted light for thin and dense
+          columns and confirmed that an empty column still contributes no light.
+          <a href="/sources/rendering-checks.txt">WebGPU measurements</a>.
+        </p>
         <h3>Smooth gradients acquired stripes</h3>
         <p>
           The dimmest parts of the veil use only a few shades on an 8-bit display. Rounding

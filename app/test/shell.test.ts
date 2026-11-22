@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { CustomBlending, OneFactor, OneMinusSrcAlphaFactor } from 'three/webgpu'
 import { uniform } from 'three/tsl'
 import { buildShellMaterial, type ShellOpts } from '../src/regimes/Shell'
 import { bakeSyntheticCubeTexture } from '../src/field/bakeCube'
@@ -27,6 +28,16 @@ function fakeCubeOpts(): ShellOpts {
 }
 
 describe('buildShellMaterial, cube branch', () => {
+  it('composites the premultiplied march output once using source-over blending', () => {
+    const material = buildShellMaterial(fakeCubeOpts())
+    try {
+      expect(material.premultipliedAlpha).toBe(false)
+      expect(material.blending).toBe(CustomBlending)
+      expect(material.blendSrc).toBe(OneFactor)
+      expect(material.blendDst).toBe(OneMinusSrcAlphaFactor)
+    } finally { material.dispose() }
+  })
+
   it('builds without throwing when the cube opts read both R and A channels', () => {
     // bakeSyntheticCubeTexture is single-channel (RedFormat) - graph
     // construction never touches real texel bytes, only builds a node

@@ -433,10 +433,12 @@ export function buildShellMaterial(opts: ShellOpts): THREE.NodeMaterial {
   material.transparent = true
   material.depthWrite = false
   material.side = THREE.BackSide
-  // The march accumulates col += T*(1-stepT), i.e. PREMULTIPLIED radiance.
-  // NormalBlending multiplies by alpha a second time, so without this the
-  // disc renders at alpha^2 (~0.002 instead of the correct ~0.046).
-  material.premultipliedAlpha = true
+  // The march already includes opacity in emitted RGB. NodeMaterial's
+  // premultipliedAlpha flag would multiply it again before blending.
+  // Composite the premultiplied column directly over the scene.
+  material.blending = THREE.CustomBlending
+  material.blendSrc = THREE.OneFactor
+  material.blendDst = THREE.OneMinusSrcAlphaFactor
 
   const march = Fn(() => {
     // The veil's own near-monochrome bioluminescent tint (spec 6.2). Named
@@ -559,7 +561,7 @@ export function buildShellMaterial(opts: ShellOpts): THREE.NodeMaterial {
     //
     // ONE scalar for the whole vec4: `col` and `alpha` are algebraically the
     // same accumulated quantity here (`col += T*(1-stepT)` versus
-    // `alpha = 1 - prod(stepT)`), the material is premultipliedAlpha, and a
+    // `alpha = 1 - prod(stepT)`), the fragment emits premultiplied RGB, and a
     // single shared factor keeps the premultiplication exact while dithering
     // luminance only — per-channel noise would dither the HUE of a
     // deliberately near-monochrome veil. RELATIVE, so it contributes

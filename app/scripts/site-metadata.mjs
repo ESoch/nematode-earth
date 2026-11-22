@@ -7,3 +7,11 @@ export function siteOrigin(value = 'https://nematode.earth') {
   }
   return url.origin
 }
+
+export function siteRevision(value) {
+  if (value == null) return null
+  if (typeof value !== 'string' || !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(value)) {
+    throw new Error('SITE_REVISION must be a full Git commit hash')
+  }
+  return value
+}

@@ -4,6 +4,7 @@ import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { brotliDecompressSync } from 'node:zlib'
 import { sha256, walkFiles, readHeaderRules, headersFor } from './release-files.mjs'
+import { siteRevision } from './site-metadata.mjs'
 
 export async function verifyReleaseData(root, { maxAssetBytes = 25 * 1024 * 1024 } = {}) {
   const manifest = JSON.parse(await readFile(resolve(root, 'release-data.json'), 'utf8'))
@@ -32,6 +33,9 @@ export async function verifyReleaseData(root, { maxAssetBytes = 25 * 1024 * 1024
 
 export async function verifyRelease(root) {
   const report = await verifyReleaseData(root)
+  const { revision } = JSON.parse(await readFile(resolve(root, 'release.json'), 'utf8'))
+  assert.equal(revision, siteRevision(revision), 'Invalid release revision')
+  if (process.env.SITE_REVISION) assert.equal(revision, siteRevision(process.env.SITE_REVISION), 'Release revision differs from build')
   const html = await readFile(resolve(root, 'index.html'), 'utf8')
   assert.equal(html, await readFile(resolve(root, 'viewer.html'), 'utf8'), 'Root and legacy exhibit must match')
   assert.ok(html.includes('id="no-webgpu"'), 'Missing non-WebGPU fallback')
@@ -42,7 +46,7 @@ export async function verifyRelease(root) {
     assert.match(page, /property="og:image" content="https:\/\/[^"<>]+"/, 'Missing absolute sharing image')
   }
   assert.ok(!(await walkFiles(root)).includes('experiments.html'), 'Engineering harness must not ship')
-  for (const file of ['favicon.svg', '404.html', 'poster_veil_11500km_v1.jpg']) await stat(resolve(root, file))
+  for (const file of ['favicon.svg', '404.html', 'poster_veil_11500km_v2.avif', 'poster_veil_11500km_v2.jpg']) await stat(resolve(root, file))
   return report
 }
 

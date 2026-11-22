@@ -1,7 +1,7 @@
 import { defineConfig, type Plugin } from 'vite'
 import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
-import { siteOrigin } from './scripts/site-metadata.mjs'
+import { siteOrigin, siteRevision } from './scripts/site-metadata.mjs'
 
 // The methods page cites these exact files. Only these names are public.
 const citedSources = new Map([
@@ -23,7 +23,7 @@ function exhibitEntry(): Plugin {
     transformIndexHtml(_html, context) {
       if (!['/viewer.html', '/about.html'].includes(context.path)) return []
       const about = context.path === '/about.html'
-      const image = `${origin}/poster_veil_11500km_v1.jpg`
+      const image = `${origin}/poster_veil_11500km_v2.jpg`
       return [
         { tag: 'link', attrs: { rel: 'canonical', href: `${origin}${about ? '/about' : '/'}` }, injectTo: 'head' },
         { tag: 'link', attrs: { rel: 'icon', type: 'image/svg+xml', href: '/favicon.svg' }, injectTo: 'head' },
@@ -31,7 +31,7 @@ function exhibitEntry(): Plugin {
         { tag: 'meta', attrs: { property: 'og:image', content: image }, injectTo: 'head' },
         { tag: 'meta', attrs: { property: 'og:image:width', content: '1200' }, injectTo: 'head' },
         { tag: 'meta', attrs: { property: 'og:image:height', content: '800' }, injectTo: 'head' },
-        { tag: 'meta', attrs: { property: 'og:image:alt', content: 'The soil nematode model rendered as a translucent globe against a dark background.' }, injectTo: 'head' },
+        { tag: 'meta', attrs: { property: 'og:image:alt', content: 'A pale veil of modelled soil nematodes outlines India and Southeast Asia against the black Indian Ocean. Northern Asia glows more brightly.' }, injectTo: 'head' },
         { tag: 'meta', attrs: { name: 'twitter:card', content: 'summary_large_image' }, injectTo: 'head' },
       ]
     },
@@ -66,6 +66,11 @@ function exhibitEntry(): Plugin {
       const viewer = bundle['viewer.html']
       if (!viewer || viewer.type !== 'asset') throw new Error('Exhibit entry was not built')
       this.emitFile({ type: 'asset', fileName: 'index.html', source: viewer.source })
+      this.emitFile({
+        type: 'asset',
+        fileName: 'release.json',
+        source: JSON.stringify({ revision: siteRevision(process.env.SITE_REVISION) }) + '\n',
+      })
       for (const [name, file] of citedSources) {
         this.emitFile({ type: 'asset', fileName: `sources${name}`, source: await readFile(file) })
       }
