@@ -4,7 +4,7 @@ If everything but the nematodes vanished, could you still recognize Earth? Zoolo
 
 **[Explore the globe](https://nematode.earth/)** · [Science & methods](https://nematode.earth/about) · [Credits and reuse terms](THIRD_PARTY_NOTICES.md)
 
-![A pale veil of modelled soil nematode abundance traces the curved edge of Earth against a dark sky.](app/public/poster_veil_11500km_v1.jpg)
+![A pale veil of modelled soil nematodes outlines India and Southeast Asia against the black Indian Ocean. Northern Asia glows more brightly.](app/public/poster_veil_11500km_v2.jpg)
 
 Play or scrub the opening to sweep away air, water, and rock. Drag to orbit, then scroll or pinch to move closer. The interactive view uses WebGPU. The poster and methods are available without it.
 

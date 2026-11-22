@@ -1,6 +1,12 @@
 # Rendering checks
 
-We compared the November 2026 renderer with commit `b4805ad` using the same soil atlas, camera pose, exposure and viewport. Browser measurements used Chrome 157 on an Apple M2 Pro with Metal. They describe this device and build.
+The coastline, marker and sweep comparisons below used commit `b4805ad` as their baseline. The later brightness check used `6c8748a`. Each comparison held the soil atlas, camera, exposure and viewport fixed. Browser measurements used Chrome 157 on an Apple M2 Pro with Metal.
+
+## Brightness of the veil
+
+The shell calculates a column’s emitted light as its tint multiplied by its opacity. The renderer used to multiply that light by opacity again when combining the shell with the background. The error was strongest in thin columns. In a WebGPU test over black, a column with opacity 0.0392 produced a linear green value of 0.00132. The corrected value was 0.03369, within 0.00001 of the reference. A denser column produced 0.34009 against a reference of 0.34014. An empty column contributed zero in all channels. A separate check over a coloured background verified that the background remained visible in proportion to the light transmitted through the shell. [GPU controls](../app/src/experiments/soilCoverageProbe.ts) · [Shell material](../app/src/regimes/Shell.ts)
+
+From 11,500 km above 7° W, 10° N, the corrected image shows density gradients across Africa’s interior while the Atlantic remains dark. At 1200 × 800 pixels and the exhibit’s 8× exposure, 74,240 pixels changed by more than 15 levels in at least one 8-bit colour channel. The brightest channel in the corrected image stayed below 255. These are display measurements of the same soil data.
 
 ## Coastlines and uncertainty
 
@@ -18,6 +24,6 @@ The viewer draws a circle three CSS pixels across for each visible sample. A cir
 
 The ocean starts at sea level. As it drains, the water reflection fades and the lighting begins to follow the exposed seafloor. In a 64 × 64 GPU control, two different seabeds produced identical colour under intact water. They differed after draining. Scrubbing back restored the original pixels. [Terrain shader](../app/src/sweep/Matter.ts) · [Relief tests](../app/test/terrain.test.ts)
 
-After the last rock disappears, the far hemisphere fades into the view over two seconds of playback. Previously it appeared in a single frame. At 7° W, 10° N and 11,500 km altitude in a 1200 × 800 view, we compared authored times 12.99 and 13.00. The old transition changed a colour channel by more than 16 of 255 levels in 20,970 globe pixels. The revised transition changed five pixels by a single level. [Sweep timing](../app/src/sweep/Timeline.ts) · [Shell renderer](../app/src/regimes/Shell.ts)
+After the last rock disappears, the far hemisphere fades into the view over two seconds of playback. Previously it appeared in a single frame. At 7° W, 10° N and 11,500 km altitude in a 1200 × 800 view, we compared authored times 12.99 and 13.00. The old transition changed a colour channel by more than 16 of 255 levels in 20,970 globe pixels. The first revision changed five pixels by a single level. Repeating the measurement after the brightness correction changed one pixel by a single level. [Sweep timing](../app/src/sweep/Timeline.ts) · [Shell renderer](../app/src/regimes/Shell.ts)
 
 At public viewing altitudes the camera’s particle-emission window lies entirely above the shell. Skipping that work took the opening and settled views from three compute dispatches to zero and from ten encoded render passes to two per frame. At 1200 × 800 CSS pixels and DPR 1, both builds sustained the display’s 120 Hz refresh rate. At DPR 2 (2400 × 1600 device pixels), we measured two 120-frame runs of the fully revealed veil. Mean frame intervals fell from 12.01 and 12.32 ms to 9.80 and 10.05 ms. The opening stayed close to the display’s 8.33 ms refresh interval in both builds. [Particle visibility test](../app/test/blend.test.ts)

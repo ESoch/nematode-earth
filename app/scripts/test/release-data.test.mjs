@@ -80,9 +80,10 @@ test('preview does not follow links to files outside its release root', async ()
 test('preview refuses to start on an uncompressed or interrupted release', async () => {
   const f = await fixture()
   await assert.rejects(preparePreview(f.root), /release-data|ENOENT/)
-  const html = '<!doctype html><link rel="canonical" href="https://nematode.earth/"><meta property="og:image" content="https://nematode.earth/poster_veil_11500km_v1.jpg"><main id="no-webgpu"></main><section id="credits"></section>'
+  const html = '<!doctype html><link rel="canonical" href="https://nematode.earth/"><meta property="og:image" content="https://nematode.earth/poster_veil_11500km_v2.jpg"><main id="no-webgpu"></main><section id="credits"></section>'
+  await writeFile(resolve(f.root, 'release.json'), JSON.stringify({ revision: process.env.SITE_REVISION ?? null }))
   for (const file of ['index.html', 'viewer.html', 'about.html']) await writeFile(resolve(f.root, file), html)
-  for (const file of ['favicon.svg', 'poster_veil_11500km_v1.jpg']) await writeFile(resolve(f.root, file), 'fixture')
+  for (const file of ['favicon.svg', 'poster_veil_11500km_v2.avif', 'poster_veil_11500km_v2.jpg']) await writeFile(resolve(f.root, file), 'fixture')
   await precompressData(f.root, { quality: 1 })
   const handler = await preparePreview(f.root)
   assert.equal((await handler(new Request('http://localhost/'))).status, 200)

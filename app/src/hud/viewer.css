@@ -283,6 +283,15 @@
 .viewer-exhibit .rail-row input[type='range']::-moz-range-thumb {
   width: 10px; height: 10px; border: 2px solid #0c1118; border-radius: 50%; background: #e6f0f7;
 }
+@media (forced-colors: active) {
+  /* The browser removes the track gradient. Give both sliders a system-color edge. */
+  .viewer-exhibit .rail-row input[type='range']::-webkit-slider-runnable-track {
+    border: 1px solid CanvasText;
+  }
+  .viewer-exhibit .rail-row input[type='range']::-moz-range-track {
+    border: 1px solid CanvasText;
+  }
+}
 .viewer-exhibit .transport-time { font-size: 11px; font-variant-numeric: tabular-nums; }
 .viewer-gestures {
   position: fixed;

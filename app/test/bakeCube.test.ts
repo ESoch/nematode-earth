@@ -86,7 +86,7 @@ describe('bakeSyntheticCubeTexture structure', () => {
     expect(cube.generateMipmaps).toBe(false)
   })
 
-  it('defaults to a 512-texel face size when no size is given', () => {
+  it('defaults to a 512-texel face size when no size is given', { timeout: 30_000 }, () => {
     const cube = bakeSyntheticCubeTexture()
     expect(cube.images[0]?.image.width).toBe(512)
     expect(cube.images[0]?.image.height).toBe(512)

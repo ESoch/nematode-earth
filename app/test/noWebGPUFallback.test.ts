@@ -164,7 +164,7 @@ describe('the still image', () => {
    * asset is renamed, deleted, or never committed — the deploy-only 404 this
    * project has already been bitten by once, with about.html.
    */
-  const inPublic = import.meta.glob('../public/*.{avif,jpg,jpeg,png,webp,gif}', {
+  const inPublic = import.meta.glob('../public/poster_veil_11500km_v*.{avif,jpg}', {
     eager: true,
     query: '?url',
     import: 'default',
@@ -173,8 +173,11 @@ describe('the still image', () => {
     .map((p) => p.replace('../public/', ''))
     .sort()
 
-  it('exists on disk, in both the modern and the universal format', () => {
-    expect(names).toEqual(['poster_veil_11500km_v1.avif', 'poster_veil_11500km_v1.jpg'])
+  it('keeps both formats available at the current and earlier immutable URLs', () => {
+    expect(names).toEqual(expect.arrayContaining([
+      'poster_veil_11500km_v1.avif', 'poster_veil_11500km_v1.jpg',
+      'poster_veil_11500km_v2.avif', 'poster_veil_11500km_v2.jpg',
+    ]))
   })
 
   it('is referenced by the fallback, and every referenced file exists', () => {
@@ -186,8 +189,8 @@ describe('the still image', () => {
   })
 
   it('offers AVIF first and falls back to JPEG, since an old browser is the whole audience', () => {
-    expect(fallbackHtml).toMatch(/<source[^>]+type="image\/avif"/)
-    expect(fallbackHtml).toMatch(/<img[^>]+src="\/poster_veil_11500km_v1\.jpg"/)
+    expect(fallbackHtml).toMatch(/<source[^>]+srcset="\/poster_veil_11500km_v2\.avif"[^>]+type="image\/avif"/)
+    expect(fallbackHtml).toMatch(/<img[^>]+src="\/poster_veil_11500km_v2\.jpg"/)
   })
 
   it('is not a data URI — the bytes stay a cacheable file', () => {

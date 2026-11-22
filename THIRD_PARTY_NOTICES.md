@@ -4,7 +4,7 @@ Ethan Soch created the viewer and data pipeline, with coding assistance from Cla
 
 | Material | Where it appears | Terms |
 | --- | --- | --- |
-| ETH soil predictions | `app/public/data/soil_plain_512_v2/`, the historical `cube_plain_128/` atlas, and the two `poster_veil_11500km_v1` images | In Copyright – Non-Commercial Use Permitted (InC-NC) |
+| ETH soil predictions | `app/public/data/soil_plain_512_v2/`, the historical `cube_plain_128/` atlas, and the JPEG and AVIF posters (`poster_veil_11500km_v1` and `poster_veil_11500km_v2`) | In Copyright – Non-Commercial Use Permitted (InC-NC) |
 | Measured soil samples | `app/public/data/nematode_samples_v2/` | CC0 1.0 |
 | NOAA elevation and derived land mask | `app/public/data/elevation_plain_*/` | CC0 1.0 |
 | JRC built-up surface | `app/public/data/urban_plain_*/` | European Commission reuse notice. Acknowledge the source and identify the changes. |
@@ -20,7 +20,7 @@ Nathan A. Cobb, “Nematodes and their relationships,” *Yearbook of the United
 
 Johan van den Hoogen and coauthors published *Soil nematode abundance and functional group composition at a global scale* in *Nature* 572, 194–198 (2019). Johan van den Hoogen and Devin Routh deposited the abundance and uncertainty rasters and the additional functional-group rasters in the ETH Zurich Research Collection. [Paper](https://doi.org/10.1038/s41586-019-1418-6) · [Abundance and uncertainty](https://doi.org/10.3929/ethz-b-000354035) · [Functional groups](https://doi.org/10.3929/ethz-b-000354394)
 
-Both deposits carry **In Copyright – Non-Commercial Use Permitted**. This statement permits non-commercial use. For other uses outside applicable copyright exceptions, seek permission from the rights holders. The soil atlases and project renders, including both posters, derive from these data. [Rights statement](https://rightsstatements.org/page/InC-NC/1.0/) · [Registered abundance record](https://api.datacite.org/dois/10.3929/ethz-b-000354035) · [Registered functional-group record](https://api.datacite.org/dois/10.3929/ethz-b-000354394)
+Both deposits carry **In Copyright – Non-Commercial Use Permitted**. This statement permits non-commercial use. For other uses outside applicable copyright exceptions, seek permission from the rights holders. The soil atlases and project renders, including the posters, derive from these data. [Rights statement](https://rightsstatements.org/page/InC-NC/1.0/) · [Registered abundance record](https://api.datacite.org/dois/10.3929/ethz-b-000354035) · [Registered functional-group record](https://api.datacite.org/dois/10.3929/ethz-b-000354394)
 
 The project resampled every row of the abundance and bootstrap uncertainty grids into six display faces. Feeding-group composition comes from a coarser extraction and has a separate coverage mask. The visual exposure, vertical profile, optical-area estimate, twenty-city comparison, and fourfold Cobb illustration are project choices or calculations. [Atlas metadata](app/public/data/soil_plain_512_v2/cube_meta.json) · [Conversion checks](docs/superpowers/results/2026-09-22-local-soil-extraction.md)
 

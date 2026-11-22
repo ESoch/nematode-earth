@@ -26,13 +26,16 @@ test('production root is the exhibit, with a legacy alias and no GPU harness', a
   await build({ root, logLevel: 'silent', build: { outDir, emptyOutDir: true, copyPublicDir: false } })
   const html = await readFile(resolve(outDir, 'index.html'), 'utf8')
   assert.equal(html, await readFile(resolve(outDir, 'viewer.html'), 'utf8'))
+  assert.deepEqual(JSON.parse(await readFile(resolve(outDir, 'release.json'), 'utf8')), {
+    revision: process.env.SITE_REVISION ?? null,
+  })
   assert.ok(html.includes('id="no-webgpu"'))
   assert.ok((await readFile(resolve(outDir, 'about.html'), 'utf8')).includes('id="credits"'))
   const origin = siteOrigin(process.env.SITE_URL)
   for (const [file, path] of [['index.html', '/'], ['about.html', '/about']]) {
     const page = await readFile(resolve(outDir, file), 'utf8')
     assert.ok(page.includes(`rel="canonical" href="${origin}${path}"`))
-    assert.ok(page.includes(`property="og:image" content="${origin}/poster_veil_11500km_v1.jpg"`))
+    assert.ok(page.includes(`property="og:image" content="${origin}/poster_veil_11500km_v2.jpg"`))
     assert.ok(page.includes('name="twitter:card" content="summary_large_image"'))
     assert.ok(page.includes('href="/favicon.svg"'))
   }

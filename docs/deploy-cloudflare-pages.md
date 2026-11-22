@@ -22,6 +22,7 @@ The preview server binds to `127.0.0.1:4173` by default and supports a `PORT` ov
 | `/` and `/viewer.html` | WebGPU exhibit and static fallback |
 | `/about` and `/about.html` | Science, methods, sources, and credits |
 | `/sources/*` | Plain-text copies of the cited calculations and software citation, drawn from the source revision at build time |
+| `/release.json` | Git commit used for the hosted build. A local build with no declared revision reports `null`. |
 | Missing path | HTTP 404 with the static error page |
 | `/experiments.html` and `/soil-validation.html` | Development-server tools, excluded from the production build |
 
@@ -36,11 +37,13 @@ The build compresses `dist/data/**/*.bin` with Brotli because the default edge c
 | Versioned poster | One year, immutable. Give a replacement a new filename. |
 | HTML, clean page URLs, citation files, and favicon | Revalidate |
 
-Pages combines matching header rules. Keep cache declarations for these groups disjoint. The release verifier enforces the Free plan’s 25 MiB per asset and 20,000 files against the compressed output. [Pages headers](https://developers.cloudflare.com/pages/configuration/headers/) · [Pages limits](https://developers.cloudflare.com/pages/platform/limits/)
+Pages combines matching header rules. Keep cache declarations for these groups disjoint. The release verifier checks the compressed output against the 25 MiB per-asset limit and the 20,000-file limit for Wrangler uploads. The dashboard accepts ZIPs with up to 1,000 files. [Pages headers](https://developers.cloudflare.com/pages/configuration/headers/) · [Direct Upload limits](https://developers.cloudflare.com/pages/get-started/direct-upload/#limits)
 
 ## Hosting
 
-For a direct-upload Pages project, upload the verified contents of `app/dist/`. Keep the artifact, manifest, and source revision together so you can reproduce or roll back a release.
+The exhibit uses a direct-upload Pages project named `nematode-earth`. After a push to `main`, the **Checks** workflow builds the site, records the commit in `release.json`, and saves a ZIP of the verified site for 14 days. Download the `nematode-earth-<commit>` artifact from the successful run. In the existing Pages project, choose **Create deployment**, select **Production**, and upload the ZIP. A push to GitHub alone leaves the previous deployment live. [Builds and artifacts](https://github.com/ESoch/nematode-earth/actions/workflows/checks.yml) · [Cloudflare Direct Upload](https://developers.cloudflare.com/pages/get-started/direct-upload/)
+
+Compare the `revision` at [the live release endpoint](https://nematode.earth/release.json) with the full commit on [GitHub main](https://github.com/ESoch/nematode-earth/commits/main/). The data manifest can stay identical across changes to the viewer or methods. For a manual build from a clean checkout, set `SITE_REVISION` to the full output of `git rev-parse HEAD` when running `pnpm build`. Keep the deployed ZIP and manifest with the release record.
 
 For a new Git-integrated Pages project, set the root directory to `app`, build command to `pnpm build`, and output directory to `dist`. Install the locked packages with the supported Node/pnpm versions. The repository includes the baked display data, so the host build needs no upstream scientific downloads. Pages project types have different deployment workflows. [Direct Upload](https://developers.cloudflare.com/pages/get-started/direct-upload/) · [Git integration](https://developers.cloudflare.com/pages/get-started/git-integration/)
 

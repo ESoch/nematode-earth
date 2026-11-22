@@ -40,15 +40,12 @@
 /data/*.json
   Cache-Control: public, max-age=31536000, immutable
 
-# --- The no-WebGPU poster. Referenced only by viewer.html's fallback, so a
-# visitor who can run the live view never fetches it at all. NOT
-# content-hashed by Vite -- it passes through from public/ under a fixed
-# name -- so the same rule as /data/* applies: the version is IN the
-# filename, and a re-capture must ship as _v2 rather than overwrite _v1,
-# or a returning visitor can be served the old frame for up to a year.
-# 17.4 KiB AVIF / 58.6 KiB JPEG at 1200x800; one of the two is fetched,
-# never both.
+# The static fallback and sharing cards use versioned poster URLs.
+# Each new capture gets its own filenames so earlier links stay valid.
 /poster_veil_11500km_v1.*
+  Cache-Control: public, max-age=31536000, immutable
+
+/poster_veil_11500km_v2.*
   Cache-Control: public, max-age=31536000, immutable
 
 # --- Build assets: Vite content-hashes these filenames
@@ -84,6 +81,9 @@
   Cache-Control: public, max-age=0, must-revalidate
 
 /favicon.svg
+  Cache-Control: public, max-age=0, must-revalidate
+
+/release.json
   Cache-Control: public, max-age=0, must-revalidate
 
 # Derived from the same checked-in source files as the exhibit.
