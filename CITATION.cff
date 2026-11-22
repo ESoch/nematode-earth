@@ -8,6 +8,7 @@ authors:
   - family-names: Soch
     given-names: Ethan
 url: https://nematode.earth/
+repository-code: https://github.com/ESoch/nematode-earth
 license: MIT
 abstract: >-
   Interactive WebGPU visualization of modelled terrestrial soil nematode

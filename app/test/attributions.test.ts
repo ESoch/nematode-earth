@@ -62,4 +62,16 @@ describe('public credits', () => {
     expect(notice).toContain('OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.')
     expect(readFileSync(new URL('../../THIRD_PARTY_NOTICES.md', import.meta.url), 'utf8')).toContain(notice)
   })
+
+  it('links the bundled MaterialX noise licences from the exhibit and repository', () => {
+    const notices = readFileSync(new URL('../../THIRD_PARTY_NOTICES.md', import.meta.url), 'utf8')
+    for (const [file, identifyingText] of [
+      ['materialx-apache-2.0.txt', 'TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION'],
+      ['openshadinglanguage-noise.txt', 'Sony Pictures Imageworks'],
+    ]) {
+      expect(credits).toContain(`href="/licenses/${file}"`)
+      expect(notices).toContain(`app/public/licenses/${file}`)
+      expect(readFileSync(new URL(`../public/licenses/${file}`, import.meta.url), 'utf8')).toContain(identifyingText)
+    }
+  })
 })

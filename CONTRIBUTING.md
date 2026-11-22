@@ -1,6 +1,8 @@
 # Contributing to Nematode Earth
 
-You can work on the viewer with Node.js 22.12+, pnpm 10.30.3, and the baked textures in the checkout. For a rendering bug, include the route, steps to reproduce, browser and OS, and what you saw. A screenshot and GPU model help when the symptom depends on the device. For a scientific correction, identify the claim or layer and link to the relevant page, figure, or dataset record. [Run the viewer locally](README.md#run-locally)
+You can work on the viewer with Node.js 22.12+, pnpm 10.30.3, and the baked textures in the checkout. [Run the viewer locally](README.md#run-locally)
+
+Open an issue to report a bug or suggest a scientific correction. For a rendering bug, include the route, steps to reproduce, browser, OS, and what you saw. A screenshot and GPU model help when the symptom depends on the device. For a scientific correction, identify the claim or layer and link to the relevant page, figure, or dataset record. [GitHub issues](https://github.com/ESoch/nematode-earth/issues)
 
 ## Where to work
 

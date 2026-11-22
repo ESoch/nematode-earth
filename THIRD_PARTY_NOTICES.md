@@ -8,7 +8,7 @@ Ethan Soch created the viewer and data pipeline, with coding assistance from Cla
 | Measured soil samples | `app/public/data/nematode_samples_v2/` | CC0 1.0 |
 | NOAA elevation and derived land mask | `app/public/data/elevation_plain_*/` | CC0 1.0 |
 | JRC built-up surface | `app/public/data/urban_plain_*/` | European Commission reuse notice. Acknowledge the source and identify the changes. |
-| Browser software and adapted shader code | Production JavaScript and the CPU reference implementation | three.js and the Vite helper use MIT. The upstream ACES fit carries the notice reproduced below. |
+| Browser software and adapted shader code | Production JavaScript and the CPU reference implementation | three.js and the Vite helper use MIT. The ACES fit and MaterialX noise routines carry additional notices below. |
 
 ## Research and exhibit data
 
@@ -112,6 +112,12 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
+
+### MaterialX and Open Shading Language noise
+
+The globe’s erosion and terrain shaders use noise functions that three.js 0.185.1 translated from MaterialX GLSL to its shader language. MaterialX adapted those routines from Open Shading Language. The site includes the MaterialX Apache 2.0 licence and the BSD-3-Clause notices for Sony Pictures Imageworks and the Open Shading Language contributors. [MaterialX licence](app/public/licenses/materialx-apache-2.0.txt) · [Open Shading Language notices](app/public/licenses/openshadinglanguage-noise.txt)
+
+The three.js source identifies the upstream GLSL file. Its header credits Sony Pictures Imageworks, and MaterialX’s third-party notice credits the wider Open Shading Language project. [three.js port](https://github.com/mrdoob/three.js/blob/2431a09f46f34c560bc8e44b33be0e567723d5b9/src/nodes/materialx/lib/mx_noise.js) · [MaterialX noise source](https://github.com/AcademySoftwareFoundation/MaterialX/blob/f85fa6b59b77ff3b091158128e79eefb9d48498b/libraries/stdlib/genglsl/lib/mx_noise.glsl) · [MaterialX licence](https://github.com/AcademySoftwareFoundation/MaterialX/blob/f85fa6b59b77ff3b091158128e79eefb9d48498b/LICENSE) · [MaterialX third-party credits](https://github.com/AcademySoftwareFoundation/MaterialX/blob/f85fa6b59b77ff3b091158128e79eefb9d48498b/THIRD-PARTY.md#openshadinglanguage)
 
 ### ACES filmic fit
 

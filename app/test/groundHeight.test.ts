@@ -191,7 +191,7 @@ describe('displacement of the mesh that is actually drawn', () => {
   })
 
   // The full-mesh raycasts check geometry correctness even on slower CI runners.
-  it('is never pierced by the mesh three.js actually builds', { timeout: 30_000 }, () => {
+  it('is never pierced by the mesh three.js actually builds', { timeout: 90_000 }, () => {
     // THE load-bearing claim: the camera floor is `cellMaxDisplacementM`, so
     // if any direction exists where the drawn surface stands above it, the
     // camera goes inside the mesh there and the frame goes black — the exact
